@@ -1,14 +1,14 @@
-## diy-bacnet-server
+## 🚀 `diy-bacnet-server`
 
-A lightweight Docker container app that spins up a BACnet/IP server using a simple **CSV file as configuration**, with full **read/write REST API support**.
+A lightweight, containerized **BACnet/IP server** powered by **FastAPI**, designed for rapid development, prototyping, and integration within modern microservice environments. This app reads a **CSV configuration file** at startup to define BACnet points and provides a **REST API** for updating and retrieving values.
 
-It runs using **FastAPI** and is intended to be **hosted on localhost by default**, designed to act as a drop-in BACnet server in a broader microservice architecture — ideal for testing, prototyping, and integration with other Docker-based systems.
+By default, it binds to **localhost**, making it safe for development and ideal for pairing with other Docker apps. It has been tested with over **300 BACnet points**, supporting **`POST /update` updates and `GET /read` reads every 4 seconds** without performance issues.
 
 ---
 
-## 🧾 CSV Config File Format Expectations
+## 🧾 CSV Configuration Format
 
-Your configuration CSV should follow this format:
+Place a CSV file in the root directory with the following structure. It is parsed at application startup to define the BACnet points exposed by the server.
 
 ```csv
 Name,Data Address,Units,Commandable
@@ -17,19 +17,19 @@ ReturnTemp,2,degreesFahrenheit,N
 StatusFlag,3,,Y
 ```
 
-### 🔑 CSV Config File Columns Explained
+### Column Descriptions:
 
-- **`Name`**: (Required) Used as the `objectName` in BACnet. This is how you reference the point in API requests.
-- **`Data Address`**: (Optional) Can be used for internal reference, included in the object's description.
-- **`Units`**: (Optional) Engineering units like `degreesFahrenheit`, `percent`, etc. Defaults to `noUnits` if left blank.
-- **`Commandable`**: (Required) Use `Y` to make the point **BACnet writable** using a priority array (i.e., a `Commandable` object). Use `N` for read-only.
+- **Name**: Required. The `objectName` used in BACnet for each point.
+- **Data Address**: Optional. Used only as a reference or in the description field.
+- **Units**: Optional. Matches BACnet `EngineeringUnits`; defaults to `noUnits` if blank.
+- **Commandable**: Use `Y` for writeable points (`AV`/`BV` with priority array support), or `N` for read-only.
 
 ---
 
 ## ⚙️ Example Use Cases
 
 - For embedded Linux projects make a BACnet server for your chiller or AHU or anything really.
-- Connect to Node-RED or other IoT automation tools that interact with BACnet/IP in edge environments.
+- For IoT edge use Node-RED or other IoT automation tools that do not have BACnet server support. This app will allow for a BAS to interact with the server via BACnet/IP.
 - Simulate field devices in a containerized environment.
 
 ---
