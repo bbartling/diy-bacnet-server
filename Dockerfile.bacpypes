@@ -1,4 +1,3 @@
-# Dockerfile.bacpypes
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -9,13 +8,17 @@ WORKDIR /app
 
 COPY requirements.txt ./
 RUN apt-get update && apt-get install -y \
-    gcc libffi-dev python3-dev build-essential \
+    gcc libffi-dev python3-dev build-essential jq \
     && pip install --no-cache-dir -r requirements.txt \
     && apt-get clean
 
 COPY bacpypes_server/ ./bacpypes_server/
 COPY csv_file/*.csv .
+COPY config.json .
 
 EXPOSE 47808/udp
 
-CMD ["python", "bacpypes_server/main.py", "--name", "MyBACnetServer ", "--instance", "400099", "--debug"]
+CMD sh -c '\
+    NAME=$(jq -r .device_name config.json) && \
+    INSTANCE=$(jq -r .device_instance config.json) && \
+    python bacpypes_server/main.py --name "$NAME" --instance "$INSTANCE" --debug'

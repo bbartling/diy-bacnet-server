@@ -97,7 +97,9 @@ async def load_csv_and_create_objects(app):
         if missing_headers:
             raise ValueError(f"CSV missing required columns: {missing_headers}")
 
-        instance_id = 1
+        av_instance_id = 1
+        bv_instance_id = 1
+
         for idx, row in enumerate(reader, start=2):  # start=2 for CSV line numbers
             try:
                 name = row["Name"].strip()
@@ -117,7 +119,7 @@ async def load_csv_and_create_objects(app):
                         if commandable
                         else AnalogValueObject
                     )(
-                        objectIdentifier=("analogValue", instance_id),
+                        objectIdentifier=("analogValue", av_instance_id),
                         objectName=name,
                         presentValue=Real(0.0),
                         statusFlags=[0, 0, 0, 0],
@@ -125,27 +127,29 @@ async def load_csv_and_create_objects(app):
                         units=engineering_unit,
                         description=f"REST-Updatable Analog Value from CSV",
                     )
+                    av_instance_id += 1
+
                 elif point_type == "BV":
                     obj = (
                         CommandableBinaryValueObject
                         if commandable
                         else BinaryValueObject
                     )(
-                        objectIdentifier=("binaryValue", instance_id),
+                        objectIdentifier=("binaryValue", bv_instance_id),
                         objectName=name,
                         presentValue="inactive",
                         statusFlags=[0, 0, 0, 0],
                         description=f"REST-Updatable Binary Value from CSV",
                     )
-                else:
-                    continue
+                    bv_instance_id += 1
 
                 app.add_object(obj)
                 point_map[name] = obj
                 _log.debug(
-                    f"Added {point_type} {instance_id}: {name} (commandable={commandable}) with units '{unit_str}'"
+                    f"Added {point_type} {av_instance_id if point_type == 'AV' else bv_instance_id}: "
+                    f"{name} (commandable={commandable}) with units '{unit_str}'"
                 )
-                instance_id += 1
+
             except Exception as e:
                 _log.error(f"Failed to create object from row {idx}: {e}")
 
