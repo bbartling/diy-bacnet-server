@@ -1,29 +1,32 @@
-## 🚀 `diy-bacnet-server`
+## 🚀 diy-bacnet-server
 
 A lightweight, containerized **BACnet/IP server** powered by **FastAPI**, designed for rapid development, prototyping, and integration within modern microservice environments. This app reads a **CSV configuration file** at startup to define BACnet points and provides a **REST API** for updating and retrieving values.
 
-By default, it binds to **localhost**, making it safe for development and ideal for pairing with other Docker apps. It has been tested with over **300 BACnet points**, supporting **`POST /update` updates and `GET /read` reads every 4 seconds** without performance issues.
+By default, it binds to **localhost**, making it safe for development and ideal for pairing with other Docker apps. It has been tested with over **300 BACnet points**, supporting **`POST /update` updates and `GET /read` reads every 4 seconds** without performance issues. The `POST /update` updates the BACnet server app point present values and the `GET /read` retrieves data being written to the BACnet server via BACnet/IP.
 
 ---
 
 ## 🧾 CSV Configuration Format
 
-Place a CSV file in the root directory with the following structure. It is parsed at application startup to define the BACnet points exposed by the server.
+Simply place a CSV file in the `csv_file` directory with the following structure. It is parsed at application startup to define the BACnet points exposed by the server. The app only supports BACnet Analog Values (AV) or Bindary Values (BV) both of which can be configured as writeble or commandable.
 
 ```csv
-Name,Data Address,Units,Commandable
-SupplyTempSetpoint,1,degreesFahrenheit,Y
-ReturnTemp,2,degreesFahrenheit,N
-StatusFlag,3,,Y
+Name,PointType,Units,Commandable
+chillerEnable,BV,Status,Y
+chwSetPoint,AV,degrees celsius,Y
+chillerDemandLimit,AV,,N
+evapDP,AV,kpa pressure units,N
+evapFlow,AV,,N
 ```
 
 ### Column Descriptions:
 
 - **Name**: Required. The `objectName` used in BACnet for each point.
-- **Data Address**: Optional. Used only as a reference or in the description field.
+- **PointType**: Required. Currently BACnet Analog Values or Bindary Value objects are supported; input an `AV` or `BV` value only.
 - **Units**: Optional. Matches BACnet `EngineeringUnits`; defaults to `noUnits` if blank.
 - **Commandable**: Use `Y` for writeable points (`AV`/`BV` with priority array support), or `N` for read-only.
 
+* TODO: For `AV` implement another column for COV values. Currently the app is hard coded on AV only for COV settings of `covIncrement=1.0`.
 ---
 
 ## ⚙️ Example Use Cases

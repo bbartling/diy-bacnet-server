@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean
 
 COPY bacpypes_server/ ./bacpypes_server/
-COPY chiller_csv_file/*.csv .
+COPY csv_file/*.csv .
 
 EXPOSE 47808/udp
 
