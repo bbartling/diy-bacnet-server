@@ -18,4 +18,4 @@ COPY csv_file/*.csv .
 
 EXPOSE 47808/udp
 
-CMD ["python", "bacpypes_server/main.py", "--name", "LogBus Chiller 1 ", "--instance", "400099", "--debug"]
+CMD ["python", "bacpypes_server/main.py", "--name", "MyBACnetServer ", "--instance", "400099", "--debug"]
