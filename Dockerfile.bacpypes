@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean
 
 COPY bacpypes_server/ ./bacpypes_server/
-COPY csv_file/*.csv .
+COPY *.csv .
 COPY config.json .
 
 EXPOSE 47808/udp
