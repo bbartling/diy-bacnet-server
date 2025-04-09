@@ -3,10 +3,10 @@ import os
 import glob
 import csv
 from difflib import get_close_matches
-from typing import Dict
 
 from fastapi import FastAPI
-from pydantic import RootModel
+from pydantic import RootModel, StrictBool, conint, confloat
+from typing import Dict, Union
 import uvicorn
 
 from bacpypes3.debugging import bacpypes_debugging, ModuleLogger
@@ -63,9 +63,10 @@ UNIT_NAME_TO_ENUM = {
 }
 
 
-# Pydantic wrapper
-class PointUpdate(RootModel[Dict[str, float | bool]]):
+# Pydantic wrapper for exception handling bad POST requests
+class PointUpdate(RootModel[Dict[str, Union[conint(strict=True), confloat(strict=True), StrictBool]]]):
     pass
+
 
 
 def resolve_unit(unit_str):
