@@ -36,8 +36,19 @@ evapFlow,AV,,N
 
 ---
 
-## 🔌 API Usage
+## 🔧 Set JSON Config File
+Use a text editor to input this data for your BACnet server device name and instance ID. This will show up when some 3rd party control system like a building automation system (BAS) discovers the app from a BACnet `Who-Is` request the app will respond with this data in the form of a BACnet `I-Am` using the underlying Python BACnet stack.
 
+```json
+{
+    "device_name": "BensBACnetServer",
+    "device_instance": 1234567
+}
+```
+
+---
+
+## 🔌 API Usage
 The app exposes a simple REST API using **FastAPI**, available by default at:
 
 ```
