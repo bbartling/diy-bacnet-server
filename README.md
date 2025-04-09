@@ -8,7 +8,7 @@ By default, it binds to **localhost**, making it safe for development and ideal 
 
 ## 🧾 CSV Configuration Format
 
-Simply place a CSV file in the `csv_file` directory with the following structure. It is parsed at application startup to define the BACnet points exposed by the server. The app only supports BACnet Analog Values (AV) or Bindary Values (BV) both of which can be configured as writeble or commandable.
+Simply place a CSV file in the `csv_file` directory with the following structure. It is parsed at application startup to define the BACnet points exposed by the server. The app only supports BACnet Analog Values (AV) or Binary Values (BV) both of which can be configured as writeble or commandable.
 
 ```csv
 Name,PointType,Units,Commandable
