@@ -1,0 +1,5 @@
+bacpypes3
+redis
+ifaddr
+fastapi 
+uvicorn

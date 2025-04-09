@@ -1,0 +1,10 @@
+version: "3.8"
+
+services:
+  bacnet_server:
+    build:
+      context: .
+      dockerfile: Dockerfile.bacpypes
+    container_name: bacnet_server
+    restart: unless-stopped
+    network_mode: "host"
