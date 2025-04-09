@@ -26,7 +26,6 @@ evapFlow,AV,,N
 - **Units**: Optional. Matches BACnet `EngineeringUnits`; defaults to `noUnits` if blank.
 - **Commandable**: Use `Y` for writeable points (`AV`/`BV` with priority array support), or `N` for read-only.
 
-* TODO: For `AV` implement another column for COV values. Currently the app is hard coded on AV only for COV settings of `covIncrement=1.0`.
 ---
 
 ## ⚙️ Example Use Cases
@@ -182,16 +181,13 @@ docker system prune -a --volumes
 
 ## ✅ Troubleshooting
 
-### Access Node-RED shell:
+### Access Docker shell:
 ```bash
-docker exec -it nodered bash
+docker exec -it bacnet_server bash
 ```
 
-### Test BACnet communication from Node-RED:
-Use `bacnet-read` or `bacnet-write` nodes to talk to `bacnet_server`.
-
-### Verify `bacnet_server` is responding:
-From a BACnet tool (e.g., YABE or VTS), scan for devices via UDP at the host IP on port 47808.
+### Test BACnet communication from other free 3rd party tools:
+Use `bacnet-read` or `bacnet-write` from tools like Yabe or the BACnet Discovery Tool (BDT)
 
 ---
 
