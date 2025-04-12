@@ -77,31 +77,29 @@ All **RPC methods** are sent as `POST /` with a JSON-RPC 2.0 body.
 ## 🛠️ Supported RPC Methods
 
 
-## 🛠️ Supported RPC Methods
-
 ### ✅ `server_hello`  
 > Returns a welcome message.
 
 ### ✅ `server_update_points`  
-> Update values for commandable points via dict payload.
+> Updates values via a dictionary payload for the BACnet server. Discoverable BACnet server objects (sometimes called "points") are defined in the CSV configuration file.
 
 ### ✅ `server_read_commandable`  
-> Read only commandable point values.
+> Reads only commandable BACnet server point values. These are points that can be written to by an external control system, such as a BAS. This method retrieves the latest values that were written to the server over BACnet for commandable points defined in the CSV file.
 
 ### ✅ `server_read_all_values`  
-> Read all present values of all configured points.
+> Reads the present values of all BACnet server points defined in the configuration, regardless of whether they are writable or read-only.
 
 ### ✅ `client_read_property`  
-> Read any BACnet property from a discovered remote device.
+> A BACnet client feature used to read any BACnet property from a discovered remote device.
 
 ### ✅ `client_write_property`  
-> Write to remote device BACnet property.
+> A BACnet client feature used to write a value to a BACnet property on a remote device.
 
 ### ✅ `client_read_multiple`  
-> Use RPM to fetch multiple remote properties at once.
+> A BACnet client feature that uses the ReadPropertyMultiple (RPM) service to fetch multiple properties from a single remote BACnet device in one request.
 
 ### ✅ `client_whois_range`  
-> Perform `Who-Is` over a specified device instance range.
+> Sends a `Who-Is` broadcast across a specified range of BACnet device instance IDs to discover devices on the network.
 
 
 ### ⏳ Planned Future RPC Methods
