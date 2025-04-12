@@ -1,4 +1,4 @@
 bacpypes3
 ifaddr
-fastapi 
+fastapi-jsonrpc
 uvicorn

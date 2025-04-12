@@ -1,14 +1,16 @@
-## 🚀 diy-bacnet-server
+## 🚀 diy-bacnet-server (Now with JSON-RPC)
 
-A lightweight, containerized **BACnet/IP server** powered by **FastAPI**, designed for rapid development, prototyping, and integration within modern microservice environments. This app reads a **CSV configuration file** at startup to define BACnet points and provides a **REST API** for updating and retrieving values.
+A lightweight, containerized **BACnet/IP server** powered by **FastAPI + JSON-RPC**, designed for rapid development, prototyping, and integration within modern microservice environments.
 
-By default, it binds to **localhost**, making it safe for development and ideal for pairing with other Docker apps. It has been tested with over **300 BACnet points**, supporting **`POST /update` updates and `GET /read` reads every 4 seconds** without performance issues. The `POST /update` updates the BACnet server app point present values and the `GET /read` retrieves data being written to the BACnet server via BACnet/IP.
+The app reads a **CSV configuration file** at startup to define BACnet points and provides a **JSON-RPC API** (instead of REST) for interacting with the BACnet/IP server.
+
+> **NEW:** JSON-RPC compliant interface with built-in [OpenRPC](https://spec.open-rpc.org/) schema support and Swagger-compatible `/docs` endpoint based on the [fastapi-jsonrpc](https://github.com/smagafurov/fastapi-jsonrpc) library.
 
 ---
 
-## 🧾 CSV Configuration Format
+## 📂 CSV Configuration Format
 
-Simply place a CSV file in the `csv_file` directory with the following structure. It is parsed at application startup to define the BACnet points exposed by the server. The app only supports BACnet Analog Values (AV) or Binary Values (BV) both of which can be configured as writeble or commandable.
+Place a CSV file in the `csv_file` directory with the following format. It is parsed at startup to define the exposed BACnet points:
 
 ```csv
 Name,PointType,Units,Commandable
@@ -19,86 +21,109 @@ evapDP,AV,kpa pressure units,N
 evapFlow,AV,,N
 ```
 
-### Column Descriptions:
-
-- **Name**: Required. The `objectName` used in BACnet for each point.
-- **PointType**: Required. Currently BACnet Analog Values or Bindary Value objects are supported; input an `AV` or `BV` value only.
-- **Units**: Optional. Matches BACnet `EngineeringUnits`; defaults to `noUnits` if blank.
-- **Commandable**: Use `Y` for writeable points (`AV`/`BV` with priority array support), or `N` for read-only.
-
----
-
-## ⚙️ Example Use Cases
-
-- For embedded Linux projects make a BACnet server for your chiller or AHU or anything really.
-- For IoT edge use Node-RED or other IoT automation tools that do not have BACnet server support. This app will allow for a BAS to interact with the server via BACnet/IP.
-- Simulate field devices in a containerized environment.
+### Columns:
+- **Name**: Required. BACnet `objectName`.
+- **PointType**: Required. Only `AV` (Analog Value) or `BV` (Binary Value) supported.
+- **Units**: Optional. BACnet `EngineeringUnits` (defaults to `noUnits` if omitted).
+- **Commandable**: `Y` for writable priority-array points, `N` for read-only.
 
 ---
 
-## 🔧 Set JSON Config File
-Use a text editor to input this data for your BACnet server device name and instance ID. This will show up when some 3rd party control system like a building automation system (BAS) discovers the app from a BACnet `Who-Is` request the app will respond with this data in the form of a BACnet `I-Am` using the underlying Python BACnet stack.
+## 🔧 API Access (via JSON-RPC)
 
-```json
-{
-    "device_name": "BensBACnetServer",
-    "device_instance": 1234567
-}
+The server starts at:
 ```
-
----
-
-## 🔌 API Usage
-The app exposes a simple REST API using **FastAPI**, available by default at:
-
+http://localhost:8080/
 ```
-http://localhost:8080
-```
-
-You can visit the interactive API docs at but note that Swagger UI is not visible from the outside as the app is hardcoded for `host="127.0.0.1", port=8080, log_level="info"` for security reasons:
-
+Interactive Swagger docs:
 ```
 http://localhost:8080/docs
 ```
 
-### 📥 `POST /update`
+All **RPC methods** are sent as `POST /` with a JSON-RPC 2.0 body.
 
-**Update BACnet point values** via JSON.
-
-#### Example Request:
-
+### Example Request Body:
 ```json
-POST /update
-Content-Type: application/json
-
 {
-  "SupplyTempSetPoint": 55.2,
-  "ChillerEnable": true
+  "jsonrpc": "2.0",
+  "method": "client_read_property",
+  "params": {
+    "device_instance": 123456,
+    "object_identifier": "analog-output,1",
+    "property_identifier": "present-value"
+  },
+  "id": "0"
 }
 ```
 
-- Values are type-checked: analog points accept floats, binary points accept booleans or `"active"` / `"inactive"`.
-- Only **commandable points** are writable.
-- Response includes only changed or error values.
+### Example Response:
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "chwSetPoint": 0.0
+  },
+  "id": "0"
+}
+```
+
+### Fields:
+- `jsonrpc`: Always `"2.0"` (protocol version).
+- `result`: The return value.
+- `id`: Echoes the request ID for correlation.
 
 ---
 
-### 📤 `GET /read`
+## 🛠️ Supported RPC Methods
 
-**Retrieve all current values** of **commandable points**.
 
-#### Example Response:
+## 🛠️ Supported RPC Methods
+
+### ✅ `server_hello`  
+> Returns a welcome message.
+
+### ✅ `server_update_points`  
+> Update values for commandable points via dict payload.
+
+### ✅ `server_read_commandable`  
+> Read only commandable point values.
+
+### ✅ `server_read_all_values`  
+> Read all present values of all configured points.
+
+### ✅ `client_read_property`  
+> Read any BACnet property from a discovered remote device.
+
+### ✅ `client_write_property`  
+> Write to remote device BACnet property.
+
+### ✅ `client_read_multiple`  
+> Use RPM to fetch multiple remote properties at once.
+
+### ✅ `client_whois_range`  
+> Perform `Who-Is` over a specified device instance range.
+
+
+### ⏳ Planned Future RPC Methods
+
+- [ ] `point_discovery`  
+- [ ] `supervisory_logic_checks`  
+- [ ] `read_point_priority_arr`  
+- [ ] `whohas`  
+- [ ] `who_is_router_to_network`  
+
+
+---
+
+## 🔗 Runtime JSON Device Configuration
+Place this config in a JSON file for identifying the device during BACnet discovery:
 
 ```json
 {
-  "SupplyTempSetPoint": 55.2,
-  "ChillerEnable": "active"
+  "device_name": "BensBACnetServer",
+  "device_instance": 1234567
 }
 ```
-
-- Includes only points marked `Commandable = Y` in the CSV.
-- Analog values returned as floats.
-- Binary values returned as `"active"` or `"inactive"`.
 
 ---
 
