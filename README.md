@@ -1,6 +1,6 @@
 ## 🚀 diy-bacnet-server (Now with JSON-RPC)
 
-A lightweight, containerized **BACnet/IP server** powered by **FastAPI + JSON-RPC**, designed for rapid development, prototyping, and integration within modern microservice environments via Docker ideal for IoT edge.
+A lightweight, containerized **BACnet/IP server**, built as a fully asynchronous **asyncio**-based application using **bacpypes3**, **FastAPI**, and **JSON-RPC**. It's designed for rapid development, prototyping, and seamless integration into modern microservice environments via Docker—ideal for IoT edge deployments.
 
 The app reads a **CSV configuration file** at startup to define BACnet points and provides a **JSON-RPC API** (instead of REST) for interacting with the BACnet/IP server.
 
