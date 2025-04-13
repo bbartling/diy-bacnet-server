@@ -4,7 +4,7 @@ A lightweight, containerized **BACnet/IP server** powered by **FastAPI + JSON-RP
 
 The app reads a **CSV configuration file** at startup to define BACnet points and provides a **JSON-RPC API** (instead of REST) for interacting with the BACnet/IP server.
 
-> **NEW:** JSON-RPC compliant interface with built-in [OpenRPC](https://spec.open-rpc.org/) schema support and Swagger-compatible `/docs` endpoint based on the [fastapi-jsonrpc](https://github.com/smagafurov/fastapi-jsonrpc) library.
+> JSON-RPC compliant interface with built-in [OpenRPC](https://spec.open-rpc.org/) schema support and Swagger-compatible `/docs` endpoint based on the [fastapi-jsonrpc](https://github.com/smagafurov/fastapi-jsonrpc) library.
 
 ---
 
@@ -29,18 +29,40 @@ evapFlow,AV,,N
 
 ---
 
-## 🔧 API Access (via JSON-RPC)
+Here’s a concise but clear section you can drop into your `README.md` to explain using VS Code’s tunnel feature for viewing the Swagger UI securely:
 
-The server starts at:
-```
-http://localhost:8080/
-```
-Interactive Swagger docs:
-```
-http://localhost:8080/docs
-```
+---
 
-All **RPC methods** are sent as `POST /` with a JSON-RPC 2.0 body.
+### 🔒 Accessing the Swagger UI via VS Code Tunnel
+
+For **security reasons**, the BACnet RPC API is hardcoded to run on `localhost` (127.0.0.1), meaning it is **not accessible externally** by default. However, when developing remotely (e.g., via SSH into a Linux server or Raspberry Pi), you can still **view the Swagger UI and test endpoints securely** using **VS Code's built-in SSH tunneling**.
+
+#### ✅ Steps to Use the Tunnel Feature:
+
+1. **Connect to the remote host using VS Code Remote - SSH.**
+
+2. Run the app:
+   ```bash
+   python3 main.py --name BensServer --instance 123456
+   ```
+
+3. When the app starts, it will log:
+   ```
+   JSON-RPC API ready at http://localhost:8080/docs
+   ```
+
+4. **VS Code will prompt you** to forward port `8080`. Click **"Forward Port"** when prompted.
+
+5. Open your browser on your local machine and go to:
+   ```
+   http://localhost:8080/docs
+   ```
+
+   You’ll now see the full **Swagger UI** for the JSON-RPC API.
+
+
+![Swagger UI](https://github.com/bbartling/heat-pump-tstat/blob/develop/images/swagger_ui.png)
+
 
 ### Example Request Body:
 ```json
