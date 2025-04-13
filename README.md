@@ -80,33 +80,69 @@ All **RPC methods** are sent as `POST /` with a JSON-RPC 2.0 body.
 ### ✅ `server_hello`  
 > Returns a welcome message.
 
+---
+
 ### ✅ `server_update_points`  
-> Updates values via a dictionary payload for the BACnet server. Discoverable BACnet server objects (sometimes called "points") are defined in the CSV configuration file.
+> Updates values via a dictionary payload for the BACnet server.  
+Discoverable BACnet server objects (sometimes called "points") are defined in the CSV configuration file.
+
+---
 
 ### ✅ `server_read_commandable`  
-> Reads only commandable BACnet server point values. These are points that can be written to by an external control system, such as a BAS. This method retrieves the latest values that were written to the server over BACnet for commandable points defined in the CSV file.
+> Reads only *commandable* BACnet server point values.  
+These are points that can be written to by an external control system, such as a BAS. This method retrieves the latest values that were written to the server over BACnet for commandable points defined in the CSV file.
+
+---
 
 ### ✅ `server_read_all_values`  
-> Reads the present values of all BACnet server points defined in the configuration, regardless of whether they are writable or read-only.
+> Reads the present values of **all** BACnet server points defined in the configuration, regardless of whether they are writable or read-only.
+
+---
 
 ### ✅ `client_read_property`  
-> A BACnet client feature used to read any BACnet property from a discovered remote device.
+> A BACnet client feature used to read any BACnet property from a discovered remote device.  
+Supports single-property reads using object identifier and property name.
+
+---
 
 ### ✅ `client_write_property`  
-> A BACnet client feature used to write a value to a BACnet property on a remote device.
+> A BACnet client feature used to write a value to a BACnet property on a remote device.  
+Supports priority-based override logic if a priority level is specified.
+
+---
 
 ### ✅ `client_read_multiple`  
-> A BACnet client feature that uses the ReadPropertyMultiple (RPM) service to fetch multiple properties from a single remote BACnet device in one request.
+> A BACnet client feature that uses the **ReadPropertyMultiple (RPM)** service to fetch multiple properties from a single remote BACnet device in one request.
+
+---
 
 ### ✅ `client_whois_range`  
-> Sends a `Who-Is` broadcast across a specified range of BACnet device instance IDs to discover devices on the network.
+> Sends a **Who-Is** broadcast across a specified range of BACnet device instance IDs to discover devices on the network.  
+Returns all I-Am responses along with metadata like vendor ID and description.
 
+---
+
+### ✅ `client_point_discovery`  
+> For a given `device_instance`, performs a discovery of all objects and their human-readable names.  
+Useful for populating a list of points available for polling, command, or analytics.
+
+---
+
+### ✅ `client_supervisory_logic_checks`  
+> Scans all objects for a single device, identifies those that support the **priority-array** property, and returns the active override values (if any).  
+This simulates supervisory control logic that checks if a point is under manual or automatic control.
+
+---
+
+### ✅ `client_read_point_priority_array`  
+> Reads the full priority array (1–16 levels) for a single point.  
+Returns a list of priority levels and their current values including nulls. This is useful for understanding overrides in effect on a writable BACnet object.
+
+---
 
 ### ⏳ Planned Future RPC Methods
 
-- [ ] `point_discovery`  
-- [ ] `supervisory_logic_checks`  
-- [ ] `read_point_priority_arr`  
+
 - [ ] `whohas`  
 - [ ] `who_is_router_to_network`  
 

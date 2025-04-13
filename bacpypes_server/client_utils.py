@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Union, Tuple, Optional
 
 from bacpypes3.pdu import Address
 from bacpypes3.primitivedata import ObjectIdentifier, Null
@@ -7,6 +7,8 @@ from bacpypes3.apdu import (
     PropertyReference,
     PropertyIdentifier,
     ErrorType,
+    AbortPDU,
+    AbortReason,
 )
 from bacpypes3.constructeddata import AnyAtomic, Sequence, Array, List
 from bacpypes3.vendor import get_vendor_info
@@ -280,3 +282,238 @@ async def perform_who_is(start_instance: int, end_instance: int):
         )
 
     return result
+
+
+async def point_discovery(
+    instance_id: Optional[int] = None,
+) -> Tuple[Optional[Address], List[ObjectIdentifier], List[str]]:
+    i_ams = await app.who_is(instance_id, instance_id)
+    if not i_ams:
+        logger.warning(f"No response from device {instance_id}")
+        return None, [], []
+
+    i_am = i_ams[0]
+    device_address: Address = i_am.pduSource
+    device_identifier: ObjectIdentifier = i_am.iAmDeviceIdentifier
+    vendor_info = get_vendor_info(i_am.vendorID)
+
+    object_list = []
+    names_list = []
+
+    try:
+        object_list = await app.read_property(
+            device_address, device_identifier, "object-list"
+        )
+        logger.info(f"Successfully read object list from {device_identifier}")
+    except AbortPDU as err:
+        if err.apduAbortRejectReason != AbortReason.segmentationNotSupported:
+            logger.error(f"Abort reading object-list: {err}")
+        return device_address, [], []
+    except ErrorRejectAbortNack as err:
+        logger.error(f"Error reading object-list: {err}")
+        return device_address, [], []
+
+    if not object_list:
+        try:
+            length = await app.read_property(
+                device_address, device_identifier, "object-list", array_index=0
+            )
+            for i in range(length):
+                obj_id = await app.read_property(
+                    device_address, device_identifier, "object-list", array_index=i + 1
+                )
+                object_list.append(obj_id)
+        except ErrorRejectAbortNack as err:
+            logger.error(f"Error reading object-list length: {err}")
+            return device_address, [], []
+
+    for obj_id in object_list:
+        object_class = vendor_info.get_object_class(obj_id[0])
+        if not object_class:
+            logger.warning(f"Unknown object type: {obj_id}")
+            continue
+        try:
+            name = await app.read_property(device_address, obj_id, "object-name")
+            names_list.append(str(name))
+        except Exception as err:
+            logger.warning(f"Error reading name for {obj_id}: {err}")
+            names_list.append("ERROR - Delete this row")
+
+    return {
+        "device_address": str(device_address),
+        "objects": [
+            {"object_identifier": str(oid), "name": name}
+            for oid, name in zip(object_list, names_list)
+        ],
+    }
+
+
+async def read_point_priority_arr(
+    address: Address, object_identifier: ObjectIdentifier
+) -> Optional[List[dict]]:
+    logger.info(f"Reading priority-array for {object_identifier} at {address}")
+    try:
+        response = await app.read_property(address, object_identifier, "priority-array")
+
+        if not response:
+            logger.info(f"No priority-array returned for {object_identifier}")
+            return None
+
+        parsed_priority_array = []
+        for index, priority_value in enumerate(response):
+            value_type = priority_value._choice
+            value = getattr(priority_value, value_type, None)
+
+            logger.debug(f"Priority {index+1}: type={value_type}, value={value}")
+
+            # Always include every slot (even null)
+            parsed_priority_array.append(
+                {
+                    "priority_level": index + 1,
+                    "type": value_type,
+                    "value": value if value is not None else None,
+                }
+            )
+
+        return parsed_priority_array
+
+    except ErrorRejectAbortNack as err:
+        logger.error(f"BACnet error reading priority-array {object_identifier}: {err}")
+    except Exception as e:
+        logger.error(
+            f"Unexpected error reading priority-array {object_identifier}: {e}"
+        )
+    return None
+
+
+def normalize_object_type(bacnet_type: str) -> str:
+    """
+    Convert 'analog-value' or 'binary-output' → 'analogValue', 'binaryOutput', etc.
+    """
+    parts = bacnet_type.split("-")
+    return parts[0] + "".join(p.capitalize() for p in parts[1:])
+
+
+def supports_priority_array(obj_type: str) -> bool:
+    normalized = normalize_object_type(obj_type)
+    return normalized in {
+        "analogOutput",
+        "binaryOutput",
+        "analogValue",
+        "binaryValue",
+        "multiStateOutput",
+        "multiStateValue",
+    }
+
+
+async def supervisory_logic_check(instance_id: int) -> dict:
+    total_points = 0
+    points_with_priority_array = 0
+    points_without_priority_array = 0
+
+    logger.info(f"🔍 Discovering device {instance_id}...")
+
+    try:
+        result = await point_discovery(instance_id)
+        device_address = result["device_address"]
+        objects = result["objects"]
+
+        if device_address is None or not objects:
+            logger.warning(f"No points found for device {instance_id}.")
+            return {
+                "device_id": instance_id,
+                "address": None,
+                "points": [],
+                "summary": {
+                    "total_points": 0,
+                    "with_priority_array": 0,
+                    "without_priority_array": 0,
+                },
+            }
+
+        logger.info(f"Found {len(objects)} points for device {instance_id}")
+
+        points = []
+
+        for obj in objects:
+            obj_type, obj_inst = obj["object_identifier"].split(",")
+            object_id = ObjectIdentifier((obj_type, int(obj_inst)))
+            point_name = obj["name"]
+            total_points += 1
+
+            if not supports_priority_array(obj_type):
+                points_without_priority_array += 1
+                logger.debug(f"⏩ {object_id} does not support priority array.")
+                continue
+
+            try:
+                priority_array = await read_point_priority_arr(
+                    Address(device_address), object_id
+                )
+
+                if not priority_array:
+                    points_without_priority_array += 1
+                    logger.info(f"No priority array for {object_id}")
+                    continue
+
+                points_with_priority_array += 1
+
+                for idx, item in enumerate(priority_array):
+                    if item.get("type") != "null":
+                        value = item["value"]
+                        value_str = {
+                            "data_as_float": float(value),
+                            "raw_data_type": value,
+                        }
+                        points.append(
+                            {
+                                "priority_level": idx + 1,
+                                "object_identifier": str(object_id),
+                                "object_name": point_name,
+                                "type": item["type"],
+                                "value": value_str,
+                            }
+                        )
+
+            except Exception as e:
+                msg = f"Error processing {object_id} ({point_name}): {e}"
+                if "unknown-property" in str(e):
+                    logger.debug(msg)
+                    points_without_priority_array += 1
+                else:
+                    logger.warning(msg)
+                continue
+
+        logger.info("=" * 40)
+        logger.info(f"Summary for device {instance_id}:")
+        logger.info(f"Total Points: {total_points}")
+        logger.info(f"With Priority Array: {points_with_priority_array}")
+        logger.info(f"Without Priority Array: {points_without_priority_array}")
+        logger.info("=" * 40)
+
+        return {
+            "device_id": instance_id,
+            "address": device_address,
+            "points": points,
+            "summary": {
+                "total_points": total_points,
+                "with_priority_array": points_with_priority_array,
+                "without_priority_array": points_without_priority_array,
+            },
+        }
+
+    except TimeoutError as timeout_err:
+        logger.error(f"Timeout for device {instance_id}: {timeout_err}")
+    except Exception as e:
+        logger.error(f"Discovery error for device {instance_id}: {e}")
+
+    return {
+        "device_id": instance_id,
+        "address": None,
+        "points": [],
+        "summary": {
+            "total_points": 0,
+            "with_priority_array": 0,
+            "without_priority_array": 0,
+        },
+    }

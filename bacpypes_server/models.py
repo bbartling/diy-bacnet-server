@@ -37,6 +37,28 @@ class BaseResponse(BaseModel):
     data: Optional[dict] = None
 
 
+class PriorityArrayResponse(BaseModel):
+    priority_level: int
+    type: str
+    value: Union[str, float, None]
+
+
+class SupervisorySummary(BaseModel):
+    device_id: int
+    address: Optional[str]
+    points: List[dict]  # You could break this into another Pydantic model if desired
+    summary: Dict[str, int]
+
+
+class DeviceInstanceOnly(BaseModel):
+    device_instance: conint(ge=0, le=4194303) = Field(
+        ..., description="Single BACnet device instance (0–4194303)"
+    )
+
+    class Config:
+        json_schema_extra = {"example": {"device_instance": 987654}}
+
+
 class DeviceInstanceRange(BaseModel):
     start_instance: conint(ge=0, le=4194303) = Field(
         ..., description="Start of the instance scan range"
@@ -212,5 +234,36 @@ class SingleReadRequest(BaseModel):
                 "device_instance": 987654,
                 "object_identifier": "analog-output,1",
                 "property_identifier": "present-value",
+            }
+        }
+
+
+class ReadPriorityArrayRequest(BaseModel):
+    device_instance: conint(ge=0, le=4194303) = Field(
+        ..., description="BACnet device instance"
+    )
+    object_identifier: str = Field(
+        ..., description="Object ID in the format 'objectType,instanceNumber'"
+    )
+
+    @field_validator("object_identifier")
+    @classmethod
+    def validate_object_identifier(cls, v):
+        if "," not in v:
+            raise ValueError("Must be in the format objectType,instanceNumber")
+        object_type, instance_str = v.split(",", 1)
+        if object_type not in ObjectType._enum_map:
+            raise ValueError(f"Invalid object type: {object_type}")
+        try:
+            int(instance_str)
+        except Exception:
+            raise ValueError("Instance number must be an integer")
+        return v
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "device_instance": 987654,
+                "object_identifier": "analog-output,1",
             }
         }

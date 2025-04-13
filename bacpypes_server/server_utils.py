@@ -97,7 +97,7 @@ async def load_csv_and_create_objects(app):
                         statusFlags=[0, 0, 0, 0],
                         covIncrement=1.0,
                         units=engineering_unit,
-                        description=f"REST-Updatable Analog Value from CSV",
+                        description=f"RPC-Updatable Analog Value from CSV",
                     )
                     av_instance_id += 1
 
@@ -111,7 +111,7 @@ async def load_csv_and_create_objects(app):
                         objectName=name,
                         presentValue="inactive",
                         statusFlags=[0, 0, 0, 0],
-                        description=f"REST-Updatable Binary Value from CSV",
+                        description=f"RPC-Updatable Binary Value from CSV",
                     )
 
                     bv_instance_id += 1

@@ -5,6 +5,9 @@ from models import (
     SingleReadRequest,
     BaseResponse,
     PointUpdate,
+    DeviceInstanceOnly,
+    ReadPriorityArrayRequest,
+    SupervisorySummary,
 )
 from client_utils import (
     bacnet_read,
@@ -12,26 +15,53 @@ from client_utils import (
     bacnet_rpm,
     perform_who_is,
     get_device_address,
+    point_discovery,
+    supervisory_logic_check,
+    read_point_priority_arr,
 )
 from server_utils import (
     point_map,
     CommandableAnalogValueObject,
     CommandableBinaryValueObject,
 )
-from errors import DeviceNotFoundError
+
+from errors import (
+    DeviceNotFoundError,
+    WhoIsFailureError,
+    PriorityArrayError,
+    ReadPropertyError,
+    WritePropertyError,
+    RPMError,
+    PointDiscoveryError,
+    SupervisoryCheckError,
+)
+
 
 from bacpypes3.local.analog import AnalogValueObject
 from bacpypes3.local.binary import BinaryValueObject
 from bacpypes3.json.util import atomic_encode
+from bacpypes3.pdu import Address
+from bacpypes3.primitivedata import ObjectIdentifier, Null
+
 import fastapi_jsonrpc as jsonrpc
+from fastapi_jsonrpc import Entrypoint
+from fastapi import Body
+from typing import Optional
 import logging
 
 
-# JSON-RPC Entrypoint must be defined before using it
+logger = logging.getLogger("rpc_methods")
+
+# This becomes the prefix path, like /bacnet
 rpc = jsonrpc.Entrypoint("")
 
 
-logger = logging.getLogger("rpc_methods")
+def parse_object_identifier(oid_str: str) -> ObjectIdentifier:
+    try:
+        obj_type, obj_inst = oid_str.split(",")
+        return ObjectIdentifier((obj_type.strip(), int(obj_inst.strip())))
+    except Exception as e:
+        raise ValueError(f"Invalid object_identifier format: {oid_str}")
 
 
 @rpc.method()
@@ -118,22 +148,34 @@ def server_read_all_values() -> dict:
 
 @rpc.method()
 async def client_read_property(request: SingleReadRequest) -> dict:
-    return await bacnet_read(
-        request.device_instance,
-        request.object_identifier,
-        request.property_identifier,
-    )
+    try:
+        return await bacnet_read(
+            request.device_instance,
+            request.object_identifier,
+            request.property_identifier,
+        )
+    except Exception as e:
+        logger.error(f"Read property failed: {e}")
+        raise ReadPropertyError(
+            data={"object_identifier": request.object_identifier, "detail": str(e)}
+        )
 
 
 @rpc.method()
 async def client_write_property(request: WritePropertyRequest) -> dict:
-    return await bacnet_write(
-        device_instance=request.device_instance,
-        object_identifier=request.object_identifier,
-        property_identifier=request.property_identifier,
-        value=request.value,
-        priority=request.priority or -1,
-    )
+    try:
+        return await bacnet_write(
+            device_instance=request.device_instance,
+            object_identifier=request.object_identifier,
+            property_identifier=request.property_identifier,
+            value=request.value,
+            priority=request.priority or -1,
+        )
+    except Exception as e:
+        logger.error(f"Write property failed: {e}")
+        raise WritePropertyError(
+            data={"object_identifier": request.object_identifier, "detail": str(e)}
+        )
 
 
 @rpc.method()
@@ -183,5 +225,56 @@ async def client_whois_range(request: DeviceInstanceRange) -> BaseResponse:
         raise jsonrpc.JsonRpcError(code=500, message="Who-Is scan failed", data=str(e))
 
 
+@rpc.method()
+async def client_point_discovery(instance: DeviceInstanceOnly) -> BaseResponse:
+    try:
+        data = await point_discovery(instance.device_instance)
+        return BaseResponse(
+            success=True, message="Point discovery successful", data=data
+        )
+    except Exception as e:
+        raise PointDiscoveryError(
+            data={"instance": instance.device_instance, "detail": str(e)}
+        )
+
+
+@rpc.method()
+async def client_supervisory_logic_checks(
+    instance: DeviceInstanceOnly,
+) -> SupervisorySummary:
+    try:
+        return await supervisory_logic_check(instance.device_instance)
+    except Exception as e:
+        raise SupervisoryCheckError(
+            data={"instance": instance.device_instance, "detail": str(e)}
+        )
+
+
+@rpc.method()
+async def client_read_point_priority_array(request: SingleReadRequest) -> list:
+    logger.info(
+        f"Reading priority array for {request.device_instance} / {request.object_identifier}"
+    )
+    try:
+        address = await get_device_address(request.device_instance)
+        object_id = parse_object_identifier(request.object_identifier)
+        priority_array = await read_point_priority_arr(address, object_id)
+
+        if priority_array is None:
+            raise PriorityArrayError(
+                data={"detail": "No priority array found or empty response"}
+            )
+
+        return priority_array
+
+    except PriorityArrayError:
+        raise  # Re-raise your own error for FastAPI JSON-RPC to catch and return
+    except Exception as e:
+        logger.error(
+            f"Unexpected error reading priority-array {request.object_identifier}: {e}"
+        )
+        raise PriorityArrayError(data={"detail": str(e)})
+
+
 # expose this to rpc_app.py
-__all__ = ["api_v1"]
+# __all__ = ["api_v1"]
