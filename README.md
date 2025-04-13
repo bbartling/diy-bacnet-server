@@ -61,7 +61,7 @@ For **security reasons**, the BACnet RPC API is hardcoded to run on `localhost` 
    You’ll now see the full **Swagger UI** for the JSON-RPC API.
 
 
-![Swagger UI](https://github.com/bbartling/heat-pump-tstat/blob/develop/images/swagger_ui.png)
+![Swagger UI](https://github.com/bbartling/diy-bacnet-server/blob/develop/snip.png)
 
 
 ### Example Request Body:
@@ -165,8 +165,8 @@ Returns a list of priority levels and their current values including nulls. This
 ### ⏳ Planned Future RPC Methods
 
 
-- [ ] `whohas`  
-- [ ] `who_is_router_to_network`  
+- [ ] `whohas` - to search for points on a BACnet system by a point name.
+- [ ] `who_is_router_to_network` - to discover BACnet MSTP networks inside a building.
 
 
 ---
