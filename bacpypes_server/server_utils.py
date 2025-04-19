@@ -16,6 +16,9 @@ from bacpypes3.basetypes import EngineeringUnits
 
 logger = logging.getLogger("loader")
 
+# used to prevent writeable points from getting updated interally
+commandable_point_names: set[str] = set()
+
 point_map: Dict[str, Object] = {}
 
 
@@ -122,5 +125,9 @@ async def load_csv_and_create_objects(app):
                     f"Added {point_type} {av_instance_id if point_type == 'AV' else bv_instance_id}: "
                     f"{name} (commandable={commandable}) with units '{unit_str}'"
                 )
+
+                if commandable:
+                    commandable_point_names.add(name)
+
             except Exception as e:
                 logger.error(f"Failed to create object from row {idx}: {e}")

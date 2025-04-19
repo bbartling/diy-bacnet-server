@@ -1,4 +1,5 @@
 from typing import List, Union, Tuple, Optional
+from errors import PointDiscoveryError
 
 from bacpypes3.pdu import Address
 from bacpypes3.primitivedata import ObjectIdentifier, Null
@@ -286,66 +287,95 @@ async def perform_who_is(start_instance: int, end_instance: int):
 
 async def point_discovery(
     instance_id: Optional[int] = None,
-) -> Tuple[Optional[Address], List[ObjectIdentifier], List[str]]:
-    i_ams = await app.who_is(instance_id, instance_id)
-    if not i_ams:
-        logger.warning(f"No response from device {instance_id}")
-        return None, [], []
-
-    i_am = i_ams[0]
-    device_address: Address = i_am.pduSource
-    device_identifier: ObjectIdentifier = i_am.iAmDeviceIdentifier
-    vendor_info = get_vendor_info(i_am.vendorID)
-
-    object_list = []
-    names_list = []
-
+) -> dict:
     try:
-        object_list = await app.read_property(
-            device_address, device_identifier, "object-list"
-        )
-        logger.info(f"Successfully read object list from {device_identifier}")
-    except AbortPDU as err:
-        if err.apduAbortRejectReason != AbortReason.segmentationNotSupported:
-            logger.error(f"Abort reading object-list: {err}")
-        return device_address, [], []
-    except ErrorRejectAbortNack as err:
-        logger.error(f"Error reading object-list: {err}")
-        return device_address, [], []
-
-    if not object_list:
-        try:
-            length = await app.read_property(
-                device_address, device_identifier, "object-list", array_index=0
+        i_ams = await app.who_is(instance_id, instance_id)
+        if not i_ams:
+            logger.warning(f"No response from device {instance_id}")
+            raise PointDiscoveryError(
+                data={
+                    "instance": instance_id,
+                    "detail": f"No response from device {instance_id} to Who-Is",
+                }
             )
-            for i in range(length):
-                obj_id = await app.read_property(
-                    device_address, device_identifier, "object-list", array_index=i + 1
-                )
-                object_list.append(obj_id)
-        except ErrorRejectAbortNack as err:
-            logger.error(f"Error reading object-list length: {err}")
-            return device_address, [], []
 
-    for obj_id in object_list:
-        object_class = vendor_info.get_object_class(obj_id[0])
-        if not object_class:
-            logger.warning(f"Unknown object type: {obj_id}")
-            continue
+        i_am = i_ams[0]
+        device_address: Address = i_am.pduSource
+        device_identifier: ObjectIdentifier = i_am.iAmDeviceIdentifier
+        vendor_info = get_vendor_info(i_am.vendorID)
+
+        object_list = []
+        names_list = []
+
         try:
-            name = await app.read_property(device_address, obj_id, "object-name")
-            names_list.append(str(name))
-        except Exception as err:
-            logger.warning(f"Error reading name for {obj_id}: {err}")
-            names_list.append("ERROR - Delete this row")
+            object_list = await app.read_property(
+                device_address, device_identifier, "object-list"
+            )
+            logger.info(f"Successfully read object list from {device_identifier}")
+        except AbortPDU as err:
+            if err.apduAbortRejectReason != AbortReason.segmentationNotSupported:
+                logger.error(f"Abort reading object-list: {err}")
+            return {
+                "device_address": str(device_address),
+                "objects": [],
+            }
+        except ErrorRejectAbortNack as err:
+            logger.error(f"Error reading object-list: {err}")
+            return {
+                "device_address": str(device_address),
+                "objects": [],
+            }
 
-    return {
-        "device_address": str(device_address),
-        "objects": [
-            {"object_identifier": str(oid), "name": name}
-            for oid, name in zip(object_list, names_list)
-        ],
-    }
+        # fallback if object-list is empty
+        if not object_list:
+            try:
+                length = await app.read_property(
+                    device_address, device_identifier, "object-list", array_index=0
+                )
+                for i in range(length):
+                    obj_id = await app.read_property(
+                        device_address,
+                        device_identifier,
+                        "object-list",
+                        array_index=i + 1,
+                    )
+                    object_list.append(obj_id)
+            except ErrorRejectAbortNack as err:
+                logger.error(f"Error reading object-list length: {err}")
+                return {
+                    "device_address": str(device_address),
+                    "objects": [],
+                }
+
+        for obj_id in object_list:
+            object_class = vendor_info.get_object_class(obj_id[0])
+            if not object_class:
+                logger.warning(f"Unknown object type: {obj_id}")
+                continue
+            try:
+                name = await app.read_property(device_address, obj_id, "object-name")
+                names_list.append(str(name))
+            except Exception as err:
+                logger.warning(f"Error reading name for {obj_id}: {err}")
+                names_list.append("ERROR - Delete this row")
+
+        return {
+            "device_address": str(device_address),
+            "objects": [
+                {"object_identifier": str(oid), "name": name}
+                for oid, name in zip(object_list, names_list)
+            ],
+        }
+
+    except PointDiscoveryError:
+        raise  # let it propagate cleanly
+    except Exception as e:
+        raise PointDiscoveryError(
+            data={
+                "instance": instance_id,
+                "detail": f"Unexpected error during discovery: {e}",
+            }
+        )
 
 
 async def read_point_priority_arr(

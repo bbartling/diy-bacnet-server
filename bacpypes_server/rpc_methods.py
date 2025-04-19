@@ -21,6 +21,7 @@ from client_utils import (
 )
 from server_utils import (
     point_map,
+    commandable_point_names,
     CommandableAnalogValueObject,
     CommandableBinaryValueObject,
 )
@@ -73,9 +74,21 @@ def server_hello() -> dict:
 @rpc.method()
 def server_update_points(update: PointUpdate) -> dict:
     result = {}
-    for name, value in update.__root__.items():
+    for name, value in update.root.items():
+
+        if name in commandable_point_names:
+            logger.warning(
+                f"Skipping update to commandable point '{name}' to avoid conflict"
+            )
+            result[name] = (
+                "skipped because point is configured as a writeable point in server object map"
+            )
+            continue
+
         obj = point_map.get(name)
         if obj is None:
+            logger.warning(f"Point '{name}' not found in server object map")
+            result[name] = "not found"
             continue
         try:
             if isinstance(obj, BinaryValueObject):
@@ -205,9 +218,7 @@ async def client_read_multiple(
     except Exception as e:
         logger.error(f"RPM failed: {e}")
         # Still a generic error here — can define RPMError later if needed
-        raise DeviceNotFoundError(
-            data={"instance": request.device_instance, "detail": str(e)}
-        )
+        raise RPMError(data={"instance": request.device_instance, "detail": str(e)})
 
 
 @rpc.method()
@@ -222,7 +233,13 @@ async def client_whois_range(request: DeviceInstanceRange) -> BaseResponse:
         )
     except Exception as e:
         logger.error(f"Who-Is scan failed: {e}")
-        raise jsonrpc.JsonRpcError(code=500, message="Who-Is scan failed", data=str(e))
+        raise WhoIsFailureError(
+            data={
+                "detail": str(e),
+                "start_instance": request.start_instance,
+                "end_instance": request.end_instance,
+            }
+        )
 
 
 @rpc.method()
@@ -230,11 +247,18 @@ async def client_point_discovery(instance: DeviceInstanceOnly) -> BaseResponse:
     try:
         data = await point_discovery(instance.device_instance)
         return BaseResponse(
-            success=True, message="Point discovery successful", data=data
+            success=True,
+            message="Point discovery successful",
+            data=data,
         )
+    except PointDiscoveryError:
+        raise  # Re-raise it cleanly without nesting
     except Exception as e:
         raise PointDiscoveryError(
-            data={"instance": instance.device_instance, "detail": str(e)}
+            data={
+                "instance": instance.device_instance,
+                "detail": f"Unexpected error during point discovery: {e}",
+            }
         )
 
 
@@ -274,7 +298,3 @@ async def client_read_point_priority_array(request: SingleReadRequest) -> list:
             f"Unexpected error reading priority-array {request.object_identifier}: {e}"
         )
         raise PriorityArrayError(data={"detail": str(e)})
-
-
-# expose this to rpc_app.py
-# __all__ = ["api_v1"]

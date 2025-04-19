@@ -42,7 +42,7 @@ async def main():
         return
 
     # Start JSON-RPC server via uvicorn
-    config = uvicorn.Config(app=rpc_api, host="0.0.0.0", port=8080, log_level="debug")
+    config = uvicorn.Config(app=rpc_api, host="127.0.0.1", port=8080, log_level="debug")
     server = uvicorn.Server(config)
 
     logger.info("JSON-RPC API ready at http://localhost:8080/docs")
