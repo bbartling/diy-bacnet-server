@@ -177,8 +177,8 @@ You can also expose the server publicly (bind to `0.0.0.0`) if needed:
 python3 bacpypes_server/main.py --name BensServer --instance 123456 --debug --public
 ```
 
-By default, the server binds to `127.0.0.1` (localhost only) for security.  
-If you specify `--public`, it binds to `0.0.0.0` and is accessible from other machines.
+By default, the server binds to `127.0.0.1` (localhost only) for security — i.e., for microservice access only, such as Docker-to-Docker communication on the same machine.
+If you specify the --public flag, the server binds to `0.0.0.0`, making it accessible from other machines outside of the host operating system's firewall.
 
 ---
 #### 🐳 **Like Docker?**  
