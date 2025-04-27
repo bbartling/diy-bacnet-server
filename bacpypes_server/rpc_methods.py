@@ -18,6 +18,7 @@ from client_utils import (
     point_discovery,
     supervisory_logic_check,
     read_point_priority_arr,
+    perform_who_is_router_to_network,
 )
 from server_utils import (
     point_map,
@@ -37,17 +38,12 @@ from errors import (
     SupervisoryCheckError,
 )
 
-
 from bacpypes3.local.analog import AnalogValueObject
 from bacpypes3.local.binary import BinaryValueObject
 from bacpypes3.json.util import atomic_encode
-from bacpypes3.pdu import Address
-from bacpypes3.primitivedata import ObjectIdentifier, Null
+from bacpypes3.primitivedata import ObjectIdentifier
 
 import fastapi_jsonrpc as jsonrpc
-from fastapi_jsonrpc import Entrypoint
-from fastapi import Body
-from typing import Optional
 import logging
 
 
@@ -275,9 +271,9 @@ async def client_supervisory_logic_checks(
 
 
 @rpc.method()
-async def client_read_point_priority_array(request: SingleReadRequest) -> list:
+async def client_read_point_priority_array(request: ReadPriorityArrayRequest) -> list:
     logger.info(
-        f"Reading priority array for {request.device_instance} / {request.object_identifier}"
+        f"Reading priority array for device_instance={request.device_instance}, object_identifier={request.object_identifier}"
     )
     try:
         address = await get_device_address(request.device_instance)
@@ -292,9 +288,23 @@ async def client_read_point_priority_array(request: SingleReadRequest) -> list:
         return priority_array
 
     except PriorityArrayError:
-        raise  # Re-raise your own error for FastAPI JSON-RPC to catch and return
+        raise
     except Exception as e:
         logger.error(
             f"Unexpected error reading priority-array {request.object_identifier}: {e}"
         )
         raise PriorityArrayError(data={"detail": str(e)})
+
+
+@rpc.method()
+async def client_whois_router_to_network() -> BaseResponse:
+    try:
+        results = await perform_who_is_router_to_network()
+        return BaseResponse(
+            success=True,
+            message="Who-Is-Router-To-Network scan complete",
+            data={"routers": results},
+        )
+    except Exception as e:
+        logger.error(f"Who-Is-Router-To-Network failed: {e}")
+        raise WhoIsFailureError(data={"detail": str(e)})

@@ -43,7 +43,7 @@ For **security reasons**, the BACnet RPC API is hardcoded to run on `localhost` 
 
 2. Run the app:
    ```bash
-   python3 main.py --name BensServer --instance 123456
+   python3 bacpypes_server/main.py --name BensServer --instance 123456
    ```
 
 3. When the app starts, it will log:

@@ -22,6 +22,8 @@ from bacpypes3.json.util import (
 from bacpypes3.primitivedata import Null
 from bacpypes3.pdu import Address
 from bacpypes3.primitivedata import ObjectIdentifier
+from bacpypes3.netservice import NetworkAdapter
+from bacpypes3.npdu import IAmRouterToNetwork
 
 from fastapi import HTTPException
 import logging
@@ -547,3 +549,43 @@ async def supervisory_logic_check(instance_id: int) -> dict:
             "without_priority_array": 0,
         },
     }
+
+
+async def perform_who_is_router_to_network() -> List[dict]:
+    logger.info(f"📡 Performing Who-Is-Router-To-Network broadcast")
+
+    assert app.nse, "Network Service Element (NSE) not available."
+
+    try:
+        result_list: List[Tuple[NetworkAdapter, IAmRouterToNetwork]] = (
+            await app.nse.who_is_router_to_network()
+        )
+    except Exception as e:
+        logger.error(f"Error sending Who-Is-Router-To-Network: {e}")
+        raise
+
+    if not result_list:
+        logger.info("No response received for Who-Is-Router-To-Network.")
+        return []
+
+    responses = []
+    previous_source = None
+
+    for adapter, i_am_router_to_network in result_list:
+        npdu_source = (
+            i_am_router_to_network.npduSADR or i_am_router_to_network.pduSource
+        )
+        if i_am_router_to_network.npduSADR:
+            npdu_source.addrRoute = i_am_router_to_network.pduSource
+
+        if not previous_source or npdu_source != previous_source:
+            responses.append(
+                {
+                    "source": str(npdu_source),
+                    "networks": i_am_router_to_network.iartnNetworkList,
+                }
+            )
+            previous_source = npdu_source
+
+    logger.info(f"Who-Is-Router-To-Network responses: {responses}")
+    return responses

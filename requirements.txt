@@ -2,3 +2,4 @@ bacpypes3
 ifaddr
 fastapi-jsonrpc
 uvicorn
+black
