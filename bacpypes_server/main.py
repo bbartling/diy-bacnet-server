@@ -1,6 +1,7 @@
 # main.py
 import asyncio
 import logging
+import argparse
 
 from rpc_app import rpc_api
 from server_utils import load_csv_and_create_objects
@@ -29,8 +30,18 @@ _debug = 1
 logger = ModuleLogger(globals())
 
 
+class CustomArgumentParser(SimpleArgumentParser):
+    def __init__(self):
+        super().__init__()
+        self.add_argument(
+            "--public",
+            action="store_true",
+            help="If set, the server will listen on 0.0.0.0 instead of 127.0.0.1",
+        )
+
+
 async def main():
-    args = SimpleArgumentParser().parse_args()
+    args = CustomArgumentParser().parse_args()
 
     try:
         bacnet_app = Application.from_args(args)
@@ -41,11 +52,14 @@ async def main():
         logger.error(f"Startup error: {e}")
         return
 
+    # Choose host based on --public
+    host = "0.0.0.0" if args.public else "127.0.0.1"
+
     # Start JSON-RPC server via uvicorn
-    config = uvicorn.Config(app=rpc_api, host="0.0.0.0", port=8080, log_level="debug")
+    config = uvicorn.Config(app=rpc_api, host=host, port=8080, log_level="debug")
     server = uvicorn.Server(config)
 
-    logger.info("JSON-RPC API ready at http://localhost:8080/docs")
+    logger.info(f"JSON-RPC API ready at http://{host}:8080/docs")
     await server.serve()
 
 

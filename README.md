@@ -31,7 +31,7 @@ evapFlow,AV,,N
 
 ### 🔒 Accessing the Swagger UI via VS Code Tunnel
 
-For **security reasons**, the BACnet RPC API is hardcoded to run on `localhost` (127.0.0.1), meaning it is **not accessible externally** by default. However, when developing remotely (e.g., via SSH into a Linux server or Raspberry Pi), you can still **view the Swagger UI and test endpoints securely** using **VS Code's built-in SSH tunneling**.
+By default **security reasons**, the BACnet RPC API is hardcoded to run on `localhost` (127.0.0.1), meaning it is **not accessible externally** by default. However, when developing remotely (e.g., via SSH into a Linux server or Raspberry Pi), you can still **view the Swagger UI and test endpoints securely** using **VS Code's built-in SSH tunneling**. If a public-facing RPC server is desired (not recommended), you can pass the `--public` flag as a command-line argument when starting the app. See the ⚡ Test App section below for the example command to start the app.
 
 #### ✅ Steps to Use the Tunnel Feature:
 
@@ -163,11 +163,23 @@ Returns a list of priority levels and their current values including nulls. This
 
 
 ---
-### ⚡ Test App 
+
+
+# ⚡ Test App
 
 ```bash
 python3 bacpypes_server/main.py --name BensServer --instance 123456 --debug
 ```
+
+You can also expose the server publicly (bind to `0.0.0.0`) if needed:
+
+```bash
+python3 bacpypes_server/main.py --name BensServer --instance 123456 --debug --public
+```
+
+By default, the server binds to `127.0.0.1` (localhost only) for security.  
+If you specify `--public`, it binds to `0.0.0.0` and is accessible from other machines.
+
 ---
 #### 🐳 **Like Docker?**  
 If you'd rather run this in a container, check out the **[Docker Setup Guide](https://github.com/bbartling/diy-bacnet-server/blob/develop/docker_readme.md)**. 🚀
