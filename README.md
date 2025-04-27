@@ -29,10 +29,6 @@ evapFlow,AV,,N
 
 ---
 
-Here’s a concise but clear section you can drop into your `README.md` to explain using VS Code’s tunnel feature for viewing the Swagger UI securely:
-
----
-
 ### 🔒 Accessing the Swagger UI via VS Code Tunnel
 
 For **security reasons**, the BACnet RPC API is hardcoded to run on `localhost` (127.0.0.1), meaning it is **not accessible externally** by default. However, when developing remotely (e.g., via SSH into a Linux server or Raspberry Pi), you can still **view the Swagger UI and test endpoints securely** using **VS Code's built-in SSH tunneling**.
@@ -162,11 +158,8 @@ Returns a list of priority levels and their current values including nulls. This
 
 ---
 
-### ⏳ Planned Future RPC Methods
-
-
-- [ ] `whohas` - to search for points on a BACnet system by a point name.
-- [ ] `who_is_router_to_network` - to discover BACnet MSTP networks inside a building.
+### ✅ `who_is_router_to_network`  
+> Discovers BACnet routers on the network that advertise routing capabilities to other BACnet networks. This includes BACnet/IP-to-MSTP gateways, but may also include other router types depending on the system architecture.
 
 
 ---
