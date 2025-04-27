@@ -40,7 +40,7 @@ docker-compose version
 From the project root where `docker-compose.yml` is located:
 
 ```bash
-docker-compose up --build -d
+docker compose up --build -d
 ```
 
 ---
@@ -49,12 +49,12 @@ docker-compose up --build -d
 
 All services:
 ```bash
-docker-compose logs -f
+docker compose logs -f
 ```
 
 Just BACnet server:
 ```bash
-docker-compose logs -f bacnet_server
+docker compose logs -f bacnet_server
 ```
 
 ---
@@ -63,14 +63,14 @@ docker-compose logs -f bacnet_server
 * note: `-d` stands for detached mode, which means “Run the containers in the background.”
 
 ```bash
-docker-compose build && docker-compose up -d --remove-orphans
+docker compose build && docker-compose up -d --remove-orphans
 ```
 ---
 
 ### 🔁 5. Rebuild Completely (Clean Start)
 * note: `-d` stands for detached mode, which means “Run the containers in the background.”
 ```bash
-docker-compose build --no-cache && docker-compose up -d --remove-orphans
+docker compose build --no-cache && docker-compose up -d --remove-orphans
 ```
 
 ---
