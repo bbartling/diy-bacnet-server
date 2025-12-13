@@ -54,21 +54,39 @@ From the project root:
 docker build -t diy-bacnet-server .
 ```
 
-This creates a reusable image named `diy-bacnet-server`.
+Run the BACnet Server
+
+
+```bash
+docker run --rm -it \
+  --network host \
+  --name bens-bacnet \
+  diy-bacnet-server \
+  python3 -u bacpypes_server/main.py \
+    --name BensServer \
+    --instance 123456 \
+    --debug \
+    --public
+
+```
 
 ---
 
-## ▶️ Run the BACnet Server
+Use `--public` only when external access is required.
+Without it, the API binds to localhost for safety.
 
-### Standard Run (recommended)
+Use `--network host` when running this container because **BACnet/IP relies on UDP broadcast and direct interface binding**, which Docker’s default bridged/NAT networking breaks. Host networking makes the container share the host’s network stack so the BACnet server behaves like a real field device on the LAN and discovery (Who-Is / I-Am) works correctly.
 
+
+Dev workflow
 ```bash
-docker run -d \
-  --name bens-bacnet \
-  -p 47808:47808/udp \
-  -p 8080:8080 \
-  diy-bacnet-server
+docker stop bens-bacnet
+docker start bens-bacnet
+docker logs -f bens-bacnet
+docker rm bens-bacnet
+
 ```
+---
 
 This:
 
@@ -76,28 +94,6 @@ This:
 * Loads points from the CSV file
 * Exposes Swagger UI at
   👉 **[http://localhost:8080/docs](http://localhost:8080/docs)**
-
----
-
-### Run With Explicit CLI Arguments
-
-You may override the default command:
-
-```bash
-docker run -d \
-  --name bens-bacnet \
-  -p 47808:47808/udp \
-  -p 8080:8080 \
-  diy-bacnet-server \
-  python3 -u bacpypes_server/main.py \
-    --name BensServer \
-    --instance 123456 \
-    --debug \
-    --public
-```
-
-Use `--public` only when external access is required.
-Without it, the API binds to localhost for safety.
 
 ---
 
