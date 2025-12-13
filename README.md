@@ -1,194 +1,335 @@
-## 🚀 diy-bacnet-server (Now with JSON-RPC)
-
-A lightweight, containerized **BACnet/IP server**, built as a fully asynchronous **asyncio**-based application using **bacpypes3**, **FastAPI**, and **JSON-RPC**. It's designed for rapid development, prototyping, and seamless integration into modern microservice environments via Docker—ideal for IoT edge deployments.
-
-The app reads a **CSV configuration file** at startup to define BACnet points and provides a **JSON-RPC API** (instead of REST) for interacting with the BACnet/IP server.
-
-> JSON-RPC compliant interface with built-in [OpenRPC](https://spec.open-rpc.org/) schema support and Swagger-compatible `/docs` endpoint based on the [fastapi-jsonrpc](https://github.com/smagafurov/fastapi-jsonrpc) library.
-
----
-
-## 📂 CSV Configuration Format
-
-Place a CSV file in the `csv_file` directory with the following format. It is parsed at startup to define the exposed BACnet points:
-
-```csv
-Name,PointType,Units,Commandable
-chillerEnable,BV,Status,Y
-chwSetPoint,AV,degrees celsius,Y
-chillerDemandLimit,AV,,N
-evapDP,AV,kpa pressure units,N
-evapFlow,AV,,N
-```
-
-### Columns:
-- **Name**: Required. BACnet `objectName`.
-- **PointType**: Required. Only `AV` (Analog Value) or `BV` (Binary Value) supported.
-- **Units**: Optional. BACnet `EngineeringUnits` (defaults to `noUnits` if omitted).
-- **Commandable**: `Y` for writable priority-array points, `N` for read-only.
-
----
-
-### 🔒 Accessing the Swagger UI via VS Code Tunnel
-
-By default **security reasons**, the BACnet RPC API is hardcoded to run on `localhost` (127.0.0.1), meaning it is **not accessible externally** by default. However, when developing remotely (e.g., via SSH into a Linux server or Raspberry Pi), you can still **view the Swagger UI and test endpoints securely** using **VS Code's built-in SSH tunneling**. If a public-facing RPC server is desired (not recommended), you can pass the `--public` flag as a command-line argument when starting the app. See the ⚡ Test App section below for the example command to start the app.
-
-#### ✅ Steps to Use the Tunnel Feature:
-
-1. **Connect to the remote host using VS Code Remote - SSH.**
-
-2. Run the app:
-   ```bash
-   python3 bacpypes_server/main.py --name BensServer --instance 123456
-   ```
-
-3. When the app starts, it will log:
-   ```
-   JSON-RPC API ready at http://localhost:8080/docs
-   ```
-
-4. **VS Code will prompt you** to forward port `8080`. Click **"Forward Port"** when prompted.
-
-5. Open your browser on your local machine and go to:
-   ```
-   http://localhost:8080/docs
-   ```
-
-   You’ll now see the full **Swagger UI** for the JSON-RPC API.
+## 🚀 diy-bacnet-server
 
 
 ![Swagger UI](https://github.com/bbartling/diy-bacnet-server/blob/develop/snip.png)
 
+This project provides a lightweight **BACnet/IP server** with a **JSON-RPC API**, designed to run cleanly as a **single Docker container** during development and early deployment.
 
-### Example Request Body:
-```json
-{
-  "jsonrpc": "2.0",
-  "method": "client_read_property",
-  "params": {
-    "device_instance": 123456,
-    "object_identifier": "analog-output,1",
-    "property_identifier": "present-value"
-  },
-  "id": "0"
-}
+The server:
+
+* Loads BACnet points from a **CSV file at startup**
+* Exposes BACnet/IP over **UDP 47808**
+* Exposes JSON-RPC / Swagger UI over **HTTP 8080**
+* Uses **FastAPI + Uvicorn + bacpypes3**
+
+> Docker Compose is intentionally **not used** at this stage.
+> It will be introduced later only when orchestrating multiple containers (test clients, simulators, etc.).
+
+---
+
+## 📦 Prerequisites
+
+* Docker Desktop (Windows / macOS / Linux)
+* Docker Engine ≥ 20.x
+
+Verify:
+
+```bash
+docker version
 ```
 
-### Example Response:
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "chwSetPoint": 0.0
-  },
-  "id": "0"
-}
+---
+
+## 📂 Project Expectations
+
+Your repository should include:
+
+```text
+Dockerfile
+requirements.txt
+bacpypes_server/
+csv_file/
+  hvac_server_points.csv
 ```
 
-### Fields:
-- `jsonrpc`: Always `"2.0"` (protocol version).
-- `result`: The return value.
-- `id`: Echoes the request ID for correlation.
+BACnet points are defined **only** by the CSV file at startup.
 
 ---
 
-## 🛠️ Supported RPC Methods
+## 🔧 Build the Docker Image
 
+From the project root:
 
-### ✅ `server_hello`  
-> Returns a welcome message.
+```bash
+docker build -t diy-bacnet-server .
+```
 
----
-
-### ✅ `server_update_points`  
-> Updates values via a dictionary payload for the BACnet server.  
-Discoverable BACnet server objects (sometimes called "points") are defined in the CSV configuration file.
+This creates a reusable image named `diy-bacnet-server`.
 
 ---
 
-### ✅ `server_read_commandable`  
-> Reads only *commandable* BACnet server point values.  
-These are points that can be written to by an external control system, such as a BAS. This method retrieves the latest values that were written to the server over BACnet for commandable points defined in the CSV file.
+## ▶️ Run the BACnet Server
+
+### Standard Run (recommended)
+
+```bash
+docker run -d \
+  --name bens-bacnet \
+  -p 47808:47808/udp \
+  -p 8080:8080 \
+  diy-bacnet-server
+```
+
+This:
+
+* Starts the BACnet/IP server
+* Loads points from the CSV file
+* Exposes Swagger UI at
+  👉 **[http://localhost:8080/docs](http://localhost:8080/docs)**
 
 ---
 
-### ✅ `server_read_all_values`  
-> Reads the present values of **all** BACnet server points defined in the configuration, regardless of whether they are writable or read-only.
+### Run With Explicit CLI Arguments
+
+You may override the default command:
+
+```bash
+docker run -d \
+  --name bens-bacnet \
+  -p 47808:47808/udp \
+  -p 8080:8080 \
+  diy-bacnet-server \
+  python3 -u bacpypes_server/main.py \
+    --name BensServer \
+    --instance 123456 \
+    --debug \
+    --public
+```
+
+Use `--public` only when external access is required.
+Without it, the API binds to localhost for safety.
 
 ---
 
-### ✅ `client_read_property`  
-> A BACnet client feature used to read any BACnet property from a discovered remote device.  
-Supports single-property reads using object identifier and property name.
+## 📋 Viewing Logs
+
+### Follow logs live
+
+```bash
+docker logs -f bens-bacnet
+```
+
+### View logs once
+
+```bash
+docker logs bens-bacnet
+```
+
+> Tip: run without `-d` to see logs directly in your terminal:
+
+```bash
+docker run -it --name bens-bacnet ...
+```
 
 ---
 
-### ✅ `client_write_property`  
-> A BACnet client feature used to write a value to a BACnet property on a remote device.  
-Supports priority-based override logic if a priority level is specified.
+## 🌐 Verifying the API
+
+### Swagger UI
+
+Open in a browser:
+
+```text
+http://localhost:8080/docs
+```
+
+### OpenAPI JSON
+
+```bash
+curl http://localhost:8080/openapi.json
+```
+
+A valid JSON response confirms the API is healthy.
 
 ---
 
-### ✅ `client_read_multiple`  
-> A BACnet client feature that uses the **ReadPropertyMultiple (RPM)** service to fetch multiple properties from a single remote BACnet device in one request.
+## 🧹 Stop & Clean Up
+
+### Stop the container
+
+```bash
+docker stop bens-bacnet
+```
+
+### Remove the container
+
+```bash
+docker rm bens-bacnet
+```
 
 ---
 
-### ✅ `client_whois_range`  
-> Sends a **Who-Is** broadcast across a specified range of BACnet device instance IDs to discover devices on the network.  
-Returns all I-Am responses along with metadata like vendor ID and description.
+## 🔄 Rebuild & Redeploy (Clean Restart)
+
+```bash
+docker stop bens-bacnet
+docker rm bens-bacnet
+docker build -t diy-bacnet-server .
+docker run -d \
+  --name bens-bacnet \
+  -p 47808:47808/udp \
+  -p 8080:8080 \
+  diy-bacnet-server
+```
 
 ---
 
-### ✅ `client_point_discovery`  
-> For a given `device_instance`, performs a discovery of all objects and their human-readable names.  
-Useful for populating a list of points available for polling, command, or analytics.
+## 🧨 Full Docker Cleanup (⚠️ Destructive)
+
+Removes unused containers, images, and networks:
+
+```bash
+docker system prune -f
+```
+
+Remove **everything** (including volumes):
+
+```bash
+docker system prune -a --volumes
+```
 
 ---
 
-### ✅ `client_supervisory_logic_checks`  
-> Scans all objects for a single device, identifies those that support the **priority-array** property, and returns the active override values (if any).  
-This simulates supervisory control logic that checks if a point is under manual or automatic control.
+## 🧪 BACnet Testing
+
+Use any BACnet/IP client tool:
+
+* YABE
+* BACnet Discovery Tool
+* Other BAS software
+
+The server will respond to:
+
+* Who-Is / I-Am
+* ReadProperty
+* WriteProperty (for commandable points)
+* Priority-array logic
 
 ---
 
-### ✅ `client_read_point_priority_array`  
-> Reads the full priority array (1–16 levels) for a single point.  
-Returns a list of priority levels and their current values including nulls. This is useful for understanding overrides in effect on a writable BACnet object.
+## 🧠 JSON-RPC API Overview
+
+This server exposes a **JSON-RPC API** (not REST) for interacting with the BACnet/IP server.
+The API is primarily intended for **supervisory logic**, testing, and integration with other services.
+
+> 📌 **You do not need to memorize these methods.**
+> The full, interactive API documentation is available via Swagger UI.
+
+👉 **[http://localhost:8080/docs](http://localhost:8080/docs)**
 
 ---
 
-### ✅ `who_is_router_to_network`  
-> Discovers BACnet routers on the network that advertise routing capabilities to other BACnet networks. This includes BACnet/IP-to-MSTP gateways, but may also include other router types depending on the system architecture.
+### What the API is used for
 
+At a high level, the API supports three main workflows:
+
+1. **Managing local BACnet server points**
+
+   * Update server-side values
+   * Read back commandable vs read-only points
+   * Inspect overrides written by external BAS systems
+
+2. **Acting as a BACnet client**
+
+   * Read properties from other BACnet devices
+   * Write properties with priority
+   * Release overrides
+   * Perform Who-Is / I-Am discovery
+
+3. **Supervisory diagnostics**
+
+   * Inspect priority arrays
+   * Detect active overrides
+   * Discover available points on remote devices
 
 ---
 
+## 🔑 Key Concepts
 
-# ⚡ Test App
+### CSV-Defined Server Points
+
+All BACnet server objects (“points”) are defined **at startup** using a CSV file.
+
+* The CSV defines:
+
+  * object name
+  * object type (AV / BV)
+  * engineering units
+  * whether the point is commandable
+* These points become discoverable BACnet objects on the network.
+* Commandable points support **priority-array logic**.
+
+---
+
+### Commandable vs Read-Only
+
+* **Commandable points**
+  Writable via BACnet (priority-based overrides).
+  Typical use: enables, setpoints, supervisory commands.
+
+* **Read-only points**
+  Updated via JSON-RPC only.
+  Typical use: sensors, calculated values, telemetry.
+
+---
+
+## 🧪 Exploring the API (Recommended Workflow)
+
+1. Start the server
+2. Open Swagger UI
+   👉 **[http://localhost:8080/docs](http://localhost:8080/docs)**
+3. Use the interactive interface to:
+
+   * Inspect available RPC methods
+   * Send test requests
+   * View responses in real time
+
+Swagger UI is the **authoritative API reference**.
+
+---
+
+## 🧪 BACnet Interoperability Testing
+
+Use any standard BACnet/IP tool:
+
+* YABE
+* BACnet Discovery Tool (BDT)
+* BAS workstations
+
+The server supports:
+
+* Who-Is / I-Am
+* ReadProperty
+* WriteProperty
+* Priority-array overrides
+* Release (null writes)
+
+---
+
+## ⚡ Running Without Docker (Optional)
+
+For direct execution during development:
 
 ```bash
 python3 bacpypes_server/main.py --name BensServer --instance 123456 --debug
 ```
 
-You can also expose the server publicly (bind to `0.0.0.0`) if needed:
+To bind publicly (use with care):
 
 ```bash
 python3 bacpypes_server/main.py --name BensServer --instance 123456 --debug --public
 ```
 
-By default, the server binds to `127.0.0.1` (localhost only) for security — i.e., for microservice access only, such as Docker-to-Docker communication on the same machine.
-If you specify the --public flag, the server binds to `0.0.0.0`, making it accessible from other machines outside of the host operating system's firewall.
+By default, the API binds to `127.0.0.1` for safety.
 
 ---
-#### 🐳 **Like Docker?**  
-If you'd rather run this in a container, check out the **[Docker Setup Guide](https://github.com/bbartling/diy-bacnet-server/blob/develop/docker_readme.md)**. 🚀
 
----
 
 ## 📜 License
-`diy-bacnet-server` is released under the **MIT License**, ensuring it remains free and accessible for all.
----
+
+Everything here is **MIT Licensed** — free, open source, and made for the BAS community.  
+Use it, remix it, or improve it — just share it forward so others can benefit too. 🥰🌍
+
 
 【MIT License】
 
