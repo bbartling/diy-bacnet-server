@@ -3,6 +3,7 @@
 
 ![Swagger UI](https://github.com/bbartling/diy-bacnet-server/blob/develop/snip.png)
 
+
 This project provides a lightweight **BACnet/IP server** with a **JSON-RPC API**, designed to run cleanly as a **single Docker container** during development and early deployment.
 
 The server:
@@ -54,8 +55,7 @@ From the project root:
 docker build -t diy-bacnet-server .
 ```
 
-Run the BACnet Server
-
+Run the BACnet Server as test:
 
 ```bash
 docker run --rm -it \
@@ -70,107 +70,52 @@ docker run --rm -it \
 
 ```
 
+How to run "Long Term" (Production Mode)
+
+```bash
+docker run -d \
+  --restart unless-stopped \
+  --network host \
+  --name bens-bacnet \
+  diy-bacnet-server \
+  python3 -u bacpypes_server/main.py \
+    --name BensServer \
+    --instance 123456 \
+    --debug \
+    --public
+```
+
 ---
+
+### Docker Args
 
 Use `--public` only when external access is required.
 Without it, the API binds to localhost for safety.
 
 Use `--network host` when running this container because **BACnet/IP relies on UDP broadcast and direct interface binding**, which Docker’s default bridged/NAT networking breaks. Host networking makes the container share the host’s network stack so the BACnet server behaves like a real field device on the LAN and discovery (Who-Is / I-Am) works correctly.
 
+Use `-d` (Detached mode) instead of `-it` to run the container in the background. This allows the BACnet server to operate as a silent daemon service that **does not take over your terminal window**, freeing up your shell for other tasks while the server runs.
+
+Remove `--rm` so the container persists after stopping. Keeping the container allows you to **inspect logs after a crash or restart the same instance later**, whereas `--rm` would immediately delete the container and its history the moment it exits.
+
+Remove `-it` because background services do not require an interactive terminal. Since no user is physically typing into the container console, allocating a pseudo-TTY is unnecessary for a long-running automation service.
+
+Use `--restart unless-stopped` to ensure reliability. This tells Docker to **automatically restart the container** if the application crashes or if the host device reboots, ensuring your BACnet server comes back online without manual intervention.
+
+---
 
 Dev workflow
 ```bash
+docker ps
 docker stop bens-bacnet
+docker rm bens-bacnet
+
 docker start bens-bacnet
 docker logs -f bens-bacnet
-docker rm bens-bacnet
 
 ```
----
 
-This:
-
-* Starts the BACnet/IP server
-* Loads points from the CSV file
-* Exposes Swagger UI at
-  👉 **[http://localhost:8080/docs](http://localhost:8080/docs)**
-
----
-
-## 📋 Viewing Logs
-
-### Follow logs live
-
-```bash
-docker logs -f bens-bacnet
-```
-
-### View logs once
-
-```bash
-docker logs bens-bacnet
-```
-
-> Tip: run without `-d` to see logs directly in your terminal:
-
-```bash
-docker run -it --name bens-bacnet ...
-```
-
----
-
-## 🌐 Verifying the API
-
-### Swagger UI
-
-Open in a browser:
-
-```text
-http://localhost:8080/docs
-```
-
-### OpenAPI JSON
-
-```bash
-curl http://localhost:8080/openapi.json
-```
-
-A valid JSON response confirms the API is healthy.
-
----
-
-## 🧹 Stop & Clean Up
-
-### Stop the container
-
-```bash
-docker stop bens-bacnet
-```
-
-### Remove the container
-
-```bash
-docker rm bens-bacnet
-```
-
----
-
-## 🔄 Rebuild & Redeploy (Clean Restart)
-
-```bash
-docker stop bens-bacnet
-docker rm bens-bacnet
-docker build -t diy-bacnet-server .
-docker run -d \
-  --name bens-bacnet \
-  -p 47808:47808/udp \
-  -p 8080:8080 \
-  diy-bacnet-server
-```
-
----
-
-## 🧨 Full Docker Cleanup (⚠️ Destructive)
+Full Docker Cleanup (⚠️ Destructive)
 
 Removes unused containers, images, and networks:
 
@@ -186,123 +131,108 @@ docker system prune -a --volumes
 
 ---
 
-## 🧪 BACnet Testing
+## Verifying the API
 
-Use any BACnet/IP client tool:
-
-* YABE
-* BACnet Discovery Tool
-* Other BAS software
-
-The server will respond to:
-
-* Who-Is / I-Am
-* ReadProperty
-* WriteProperty (for commandable points)
-* Priority-array logic
-
----
-
-## 🧠 JSON-RPC API Overview
+JSON-RPC API Overview
 
 This server exposes a **JSON-RPC API** (not REST) for interacting with the BACnet/IP server.
 The API is primarily intended for **supervisory logic**, testing, and integration with other services.
 
-> 📌 **You do not need to memorize these methods.**
-> The full, interactive API documentation is available via Swagger UI.
+### Swagger UI
 
-👉 **[http://localhost:8080/docs](http://localhost:8080/docs)**
+Open in a browser:
 
----
+```text
+http://localhost:8080/docs
+```
 
-### What the API is used for
+### OpenAPI JSON
 
-At a high level, the API supports three main workflows:
-
-1. **Managing local BACnet server points**
-
-   * Update server-side values
-   * Read back commandable vs read-only points
-   * Inspect overrides written by external BAS systems
-
-2. **Acting as a BACnet client**
-
-   * Read properties from other BACnet devices
-   * Write properties with priority
-   * Release overrides
-   * Perform Who-Is / I-Am discovery
-
-3. **Supervisory diagnostics**
-
-   * Inspect priority arrays
-   * Detect active overrides
-   * Discover available points on remote devices
+```bash
+curl http://localhost:8080/openapi.json
+```
 
 ---
 
-## 🔑 Key Concepts
+## 🔄 Workflow: Updating Sensor Data On BACnet Server
 
-### CSV-Defined Server Points
+This workflow demonstrates how to initialize the server with default values and then simulate live sensor readings by updating **read-only** points via the API.
 
-All BACnet server objects (“points”) are defined **at startup** using a CSV file.
+### 1. Define Points in CSV
 
-* The CSV defines:
+Configure your server points in `hvac_server_points.csv`.
 
-  * object name
-  * object type (AV / BV)
-  * engineering units
-  * whether the point is commandable
-* These points become discoverable BACnet objects on the network.
-* Commandable points support **priority-array logic**.
+  * Use `Commandable,Y` for points controlled by BACnet clients (e.g., setpoints).
+  * Use `Commandable,N` for points fed by the API (e.g., sensors).
+  * Use the `Default` column to set startup values.
+
+<!-- end list -->
+
+```csv
+Name,PointType,Units,Commandable,Default
+optimization-enable,BV,Status,Y,active
+setpoint-temp,AV,degreesFahrenheit,Y,72.5
+outdoor-temp,AV,degreesFahrenheit,N,22.0
+```
+
+### 2. Verify Startup Values
+
+Confirm the server loaded the defaults correctly using the `server_read_all_values` endpoint from the Swagger UI.
+
+
+**Response In Swagger UI**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "optimization-enable": "active",
+    "setpoint-temp": 72.5,
+    "outdoor-temp": 22.0
+  },
+  "id": "0"
+}
+```
+
+### 3. Update Read-Only Point `outdoor-temp`
+
+Use the `server_update_points` method to push new data to non-commandable points.
+
+> **Note:** This method will ingore if you try to update a `Commandable,Y` point (like `setpoint-temp`), as those must be written via BACnet priority arrays.
+
+**Request in Swagger UI**
+
+```bash
+{
+  "jsonrpc": "2.0",
+  "id": "1",
+  "method": "server_update_points",
+  "params": {
+    "update": {
+      "outdoor-temp": 55.4
+    }
+  }
+}
+```
+
+**Response In Swagger UI**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "updated_bacnet_points": {
+      "outdoor-temp": "changed from 22.0 → 55.4"
+    }
+  },
+  "id": "1"
+}
+```
+
 
 ---
 
-### Commandable vs Read-Only
-
-* **Commandable points**
-  Writable via BACnet (priority-based overrides).
-  Typical use: enables, setpoints, supervisory commands.
-
-* **Read-only points**
-  Updated via JSON-RPC only.
-  Typical use: sensors, calculated values, telemetry.
-
----
-
-## 🧪 Exploring the API (Recommended Workflow)
-
-1. Start the server
-2. Open Swagger UI
-   👉 **[http://localhost:8080/docs](http://localhost:8080/docs)**
-3. Use the interactive interface to:
-
-   * Inspect available RPC methods
-   * Send test requests
-   * View responses in real time
-
-Swagger UI is the **authoritative API reference**.
-
----
-
-## 🧪 BACnet Interoperability Testing
-
-Use any standard BACnet/IP tool:
-
-* YABE
-* BACnet Discovery Tool (BDT)
-* BAS workstations
-
-The server supports:
-
-* Who-Is / I-Am
-* ReadProperty
-* WriteProperty
-* Priority-array overrides
-* Release (null writes)
-
----
-
-## ⚡ Running Without Docker (Optional)
+## ⚡ Running Without Docker (Optional for testing purposes) 
 
 For direct execution during development:
 

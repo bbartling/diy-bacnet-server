@@ -64,7 +64,9 @@ def resolve_unit(unit_str):
 
 
 async def load_csv_and_create_objects(app):
+    # Added "Default" to the allowed headers logic (optional check)
     required_headers = {"Name", "PointType", "Units", "Commandable"}
+    
     with open(CSV_FILE, newline="") as csvfile:
         reader = csv.DictReader(csvfile)
         headers = set(reader.fieldnames or [])
@@ -81,7 +83,13 @@ async def load_csv_and_create_objects(app):
                 point_type = row.get("PointType", "").strip().upper()
                 unit_str = row.get("Units", "").strip()
                 commandable = row.get("Commandable", "").strip().upper() == "Y"
-
+                
+                # --- NEW LOGIC: Parse Default Value ---
+                default_val_str = row.get("Default", "").strip()
+                
+                # Default logic will apply if the column exists and isn't empty
+                # Otherwise, it falls back to 0.0 or "inactive"
+                
                 if not name or point_type not in {"AV", "BV"}:
                     logger.warning(f"Skipping invalid row {idx}: {row}")
                     continue
@@ -89,6 +97,13 @@ async def load_csv_and_create_objects(app):
                 engineering_unit = resolve_unit(unit_str)
 
                 if point_type == "AV":
+                    # Parse float for Analog, default to 0.0 if missing/invalid
+                    try:
+                        initial_value = float(default_val_str) if default_val_str else 0.0
+                    except ValueError:
+                        logger.warning(f"Row {idx}: Invalid AV default '{default_val_str}', using 0.0")
+                        initial_value = 0.0
+
                     obj = (
                         CommandableAnalogValueObject
                         if commandable
@@ -96,7 +111,9 @@ async def load_csv_and_create_objects(app):
                     )(
                         objectIdentifier=("analogValue", av_instance_id),
                         objectName=name,
-                        presentValue=Real(0.0),
+                        presentValue=Real(initial_value),  # <--- UPDATED
+                        # For commandable points, relinquishing defaults often falls back to this
+                        relinquishDefault=Real(initial_value) if commandable else None,
                         statusFlags=[0, 0, 0, 0],
                         covIncrement=1.0,
                         units=engineering_unit,
@@ -105,6 +122,14 @@ async def load_csv_and_create_objects(app):
                     av_instance_id += 1
 
                 elif point_type == "BV":
+                    # Parse boolean-ish string for Binary
+                    is_active = default_val_str.lower() in {"true", "active", "1", "y", "yes", "on"}
+                    initial_value = "active" if is_active else "inactive"
+
+                    # If the column was empty, strictly default to inactive (or keep logic above)
+                    if not default_val_str: 
+                        initial_value = "inactive"
+
                     obj = (
                         CommandableBinaryValueObject
                         if commandable
@@ -112,7 +137,8 @@ async def load_csv_and_create_objects(app):
                     )(
                         objectIdentifier=("binaryValue", bv_instance_id),
                         objectName=name,
-                        presentValue="inactive",
+                        presentValue=initial_value, # <--- UPDATED
+                        relinquishDefault=initial_value if commandable else None,
                         statusFlags=[0, 0, 0, 0],
                         description=f"RPC-Updatable Binary Value from CSV",
                     )
@@ -122,8 +148,7 @@ async def load_csv_and_create_objects(app):
                 app.add_object(obj)
                 point_map[name] = obj
                 logger.debug(
-                    f"Added {point_type} {av_instance_id if point_type == 'AV' else bv_instance_id}: "
-                    f"{name} (commandable={commandable}) with units '{unit_str}'"
+                    f"Added {point_type} {name} (Cmd={commandable}) val={initial_value}"
                 )
 
                 if commandable:
