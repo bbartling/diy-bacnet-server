@@ -92,7 +92,9 @@ docker run -d \
 Use `--public` only when external access is required.
 Without it, the API binds to localhost for safety.
 
-Use `--network host` when running this container because **BACnet/IP relies on UDP broadcast and direct interface binding**, which Docker’s default bridged/NAT networking breaks. Host networking makes the container share the host’s network stack so the BACnet server behaves like a real field device on the LAN and discovery (Who-Is / I-Am) works correctly.
+Use `--network host` when running this container because **BACnet/IP relies on UDP broadcast and direct interface binding**, which Docker’s default bridged/NAT networking breaks. Host networking allows the container to behave like a real BACnet device on the LAN so discovery (Who-Is / I-Am) works correctly.
+
+Use `--address <ip>/<cidr>[:port]` to explicitly bind BACnet/IP traffic to the **correct NIC** on multi-NIC edge devices (for example, BAS/BMS LAN vs internet). This ensures broadcasts originate on the control network and not the IT network. If the port is omitted, the server defaults to **47808**.
 
 Use `-d` (Detached mode) instead of `-it` to run the container in the background. This allows the BACnet server to operate as a silent daemon service that **does not take over your terminal window**, freeing up your shell for other tasks while the server runs.
 
