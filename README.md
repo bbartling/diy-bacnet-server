@@ -252,6 +252,17 @@ By default, the API binds to `127.0.0.1` for safety.
 
 ---
 
+## Unit Tests
+
+This test suite ensures that the DIY BACnet Server works reliably as a real, usable application rather than just code that runs. It verifies that the Docker-based BACnet server container starts correctly, initializes its services, and responds as expected. It also confirms that the JSON-RPC interface is correctly wired, exposing the appropriate RPC entrypoint and methods, and that important RPC helpers—such as the server readiness check and BACnet Who-Is discovery wrapper—can execute safely without crashing. Together, these tests validate the integration between FastAPI, fastapi-jsonrpc, Pydantic models, and BACpypes3 to ensure the system behaves as a functional BACnet utility service.
+
+
+```bash
+pytest
+```
+
+---
+
 
 ## 📜 License
 

@@ -1,5 +1,5 @@
 from typing import List, Union, Tuple, Optional
-from errors import PointDiscoveryError
+from bacpypes_server.errors import PointDiscoveryError
 
 from bacpypes3.pdu import Address
 from bacpypes3.primitivedata import ObjectIdentifier, Null

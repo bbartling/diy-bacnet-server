@@ -1,7 +1,7 @@
 # rpc_app.py
 import fastapi_jsonrpc as jsonrpc
 from fastapi.responses import RedirectResponse
-from rpc_methods import rpc
+from bacpypes_server.rpc_methods import rpc
 
 rpc_api = jsonrpc.API()
 rpc_api.bind_entrypoint(rpc)

@@ -3,3 +3,4 @@ ifaddr
 fastapi-jsonrpc
 uvicorn
 black
+pytest-asyncio
