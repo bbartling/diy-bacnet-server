@@ -13,21 +13,50 @@ The server:
 * Exposes JSON-RPC / Swagger UI over **HTTP 8080**
 * Uses **FastAPI + Uvicorn + bacpypes3**
 
-> Docker Compose is intentionally **not used** at this stage.
-> It will be introduced later only when orchestrating multiple containers (test clients, simulators, etc.).
 
 ---
+
 
 ## 📦 Prerequisites
 
 * Docker Desktop (Windows / macOS / Linux)
 * Docker Engine ≥ 20.x
 
-Verify:
+**Verify Docker Engine:**
 
 ```bash
 docker version
+
 ```
+
+**Verify Docker Compose (V2):**
+
+```bash
+docker compose version
+
+```
+
+> **Note:** This project uses the modern `docker compose` command (with a space).
+
+---
+
+### 🛠️ Installation (Raspberry Pi / Linux)
+
+If Docker is not installed, use the official convenience script. This installs both the Docker Engine and the modern Compose plugin automatically:
+
+```bash
+# 1. Update system
+sudo apt-get update
+
+# 2. Install Docker Engine + Docker Compose V2
+curl -sSL [https://get.docker.com](https://get.docker.com) | sh
+
+# 3. Add your user to the docker group (avoids using 'sudo' for every command)
+sudo usermod -aG docker $USER
+
+```
+
+> Log out and log back in for the user group changes to take effect.*
 
 ---
 
@@ -106,30 +135,92 @@ Use `--restart unless-stopped` to ensure reliability. This tells Docker to **aut
 
 ---
 
-Dev workflow
+
+## 🔄 Running Updates and Unit Tests Workflow
+
+Use this workflow when you have pulled new code and need to verify it before redeploying.
+
+### 1. Stop the Running Server
+Free up the container name and ports:
+
 ```bash
-docker ps
 docker stop bens-bacnet
 docker rm bens-bacnet
 
-docker start bens-bacnet
+```
+
+### 2. Pull Updates & Run Tests
+
+Ensure your local Python environment is up to date and that the new code passes all tests.
+
+```bash
+# Get latest code
+git pull
+
+# Create/Activate Virtual Environment (if not already done)
+python3 -m venv env
+source env/bin/activate
+
+# Install latest dependencies
+pip install -r requirements.txt
+
+# Run the test suite
+pytest
+
+```
+
+### 3. Rebuild & Restart (Production)
+
+If tests pass, rebuild the Docker image and launch the long-term server.
+
+**Note:** We add `--env PYTHONPATH=/app` to ensure Python finds the internal modules correctly.
+
+```bash
+# Rebuild image
+docker build -t diy-bacnet-server .
+
+# Run production container
+docker run -d \
+  --restart unless-stopped \
+  --network host \
+  --name bens-bacnet \
+  --env PYTHONPATH=/app \
+  diy-bacnet-server \
+  python3 -u bacpypes_server/main.py \
+    --name BensServer \
+    --instance 123456 \
+    --debug \
+    --public
+
+```
+
+### 4. Verify Logs
+
+```bash
 docker logs -f bens-bacnet
 
 ```
 
-Full Docker Cleanup (⚠️ Destructive)
+---
 
-Removes unused containers, images, and networks:
+## 🧹 Docker Cleanup
+
+**Routine Cleanup**
+Removes stopped containers, unused networks, and dangling images:
 
 ```bash
 docker system prune -f
+
 ```
 
-Remove **everything** (including volumes):
+**Full Reset (⚠️ Destructive)**
+Removes **all** stopped containers, unused networks, and **all** unused images (including the one you just built):
 
 ```bash
 docker system prune -a --volumes
+
 ```
+
 
 ---
 

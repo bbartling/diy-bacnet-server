@@ -12,7 +12,10 @@ services:
     stdin_open: true
     tty: true
     environment:
-      # Optional override for CSV path if you add support later
+      # FIX: Add this line so Python can find the 'bacpypes_server' package
+      PYTHONPATH: /app
+      
+      # Optional override for CSV path
       HVAC_SERVER_POINTS_CSV: /app/hvac_server_points.csv
     command: >
       python3 -u bacpypes_server/main.py
