@@ -60,9 +60,9 @@ sudo usermod -aG docker $USER
 
 ---
 
-## 📂 Project Expectations
+## 📂 BACnet Server Defined by CSV File
 
-Your repository should include:
+Your repository should include an example CSV file:
 
 ```text
 Dockerfile
@@ -72,13 +72,63 @@ csv_file/
   hvac_server_points.csv
 ```
 
-BACnet points are defined **only** by the CSV file at startup.
+### 📄 CSV Reference Description
+
+This CSV defines the BACnet points that the server will expose. Each row represents a single BACnet object, including its type, engineering units, whether it is commandable, and an optional default value.
+
+Example:
+
+```
+Name,PointType,Units,Commandable,Default
+optimization-enable,BV,Status,Y,active
+setpoint-temp,AV,degreesFahrenheit,Y,72.5
+outdoor-temp,AV,degreesFahrenheit,N,22.0
+```
+
+---
+
+### 🧠 Column Meanings
+
+**`Name`**
+Human-friendly / API name for the BACnet point.
+
+**`PointType`**
+BACnet object type:
+
+* `AV` = Analog Value
+* `BV` = Binary Value
+  (You could extend this later with AI/AO/BI/BO/etc.)
+
+**`Units`**
+Engineering units for analog points (e.g., `degreesFahrenheit`, `Status`, `percent`, etc.).
+
+**`Commandable`**
+Indicates whether this point can be written to:
+
+* `Y` = Commandable (clients can write / override)
+* `N` = Read-only
+
+**`Default`**
+Initial value the point is initialized with when the server starts.
+
+---
+
+### 🧾 What these specific rows represent
+
+| Name                | BACnet Type | Meaning                             | Commandable? | Default |
+| ------------------- | ----------- | ----------------------------------- | ------------ | ------- |
+| optimization-enable | BV          | Enables/disables optimization logic | Yes          | active  |
+| setpoint-temp       | AV          | HVAC temperature setpoint           | Yes          | 72.5°F  |
+| outdoor-temp        | AV          | Outside air temperature reference   | No           | 22°F    |
+
+
+> Refer to the Swagger UI for details on how data is read from and written to the BACnet server. Points are updated and retrieved using JSON-RPC POST requests.
 
 ---
 
 ## 🔧 Build the Docker Image
 
-From the project root:
+Clone the repo from GitHub and from the project root:
 
 ```bash
 docker build -t diy-bacnet-server .
@@ -91,7 +141,7 @@ docker run --rm -it \
   --network host \
   --name bens-bacnet \
   diy-bacnet-server \
-  python3 -u bacpypes_server/main.py \
+  python3 -m bacpypes_server.main \
     --name BensServer \
     --instance 123456 \
     --debug \
@@ -107,7 +157,7 @@ docker run -d \
   --network host \
   --name bens-bacnet \
   diy-bacnet-server \
-  python3 -u bacpypes_server/main.py \
+  python3 -m bacpypes_server.main \
     --name BensServer \
     --instance 123456 \
     --debug \
@@ -151,7 +201,7 @@ docker rm bens-bacnet
 
 ### 2. Pull Updates & Run Tests
 
-Ensure your local Python environment is up to date and that the new code passes all tests.
+Stop the docker container and ensure your local Python environment is up to date and that the new code passes all tests.
 
 ```bash
 # Get latest code
@@ -186,7 +236,7 @@ docker run -d \
   --name bens-bacnet \
   --env PYTHONPATH=/app \
   diy-bacnet-server \
-  python3 -u bacpypes_server/main.py \
+  python3 -m bacpypes_server.main \
     --name BensServer \
     --instance 123456 \
     --debug \
@@ -203,7 +253,7 @@ docker logs -f bens-bacnet
 
 ---
 
-## 🧹 Docker Cleanup
+## 🧹 Docker Maintenance
 
 **Routine Cleanup**
 Removes stopped containers, unused networks, and dangling images:
@@ -343,12 +393,17 @@ By default, the API binds to `127.0.0.1` for safety.
 
 ---
 
-## Unit Tests
+## Unit Tests Notes
 
 This test suite ensures that the DIY BACnet Server works reliably as a real, usable application rather than just code that runs. It verifies that the Docker-based BACnet server container starts correctly, initializes its services, and responds as expected. It also confirms that the JSON-RPC interface is correctly wired, exposing the appropriate RPC entrypoint and methods, and that important RPC helpers—such as the server readiness check and BACnet Who-Is discovery wrapper—can execute safely without crashing. Together, these tests validate the integration between FastAPI, fastapi-jsonrpc, Pydantic models, and BACpypes3 to ensure the system behaves as a functional BACnet utility service.
 
 
 ```bash
+# run tests from a virtual environment
+python3 -m venv env
+. ./env/bin/activate
+pip install -r ./requirements.txt
+
 pytest
 ```
 
