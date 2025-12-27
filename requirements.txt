@@ -4,3 +4,4 @@ fastapi-jsonrpc
 uvicorn
 black
 pytest-asyncio
+requests
