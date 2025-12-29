@@ -1,8 +1,6 @@
 ## 🚀 diy-bacnet-server
 
-
 ![Swagger UI](https://github.com/bbartling/diy-bacnet-server/blob/develop/snip.png)
-
 
 
 This project provides a lightweight **BACnet/IP server** with a **JSON-RPC API**, designed to run cleanly as a **single Docker-container microservice** for IoT applications. It also works great as an easy BACnet server deployment for any embedded-Linux project that supports Docker.
@@ -14,10 +12,16 @@ The server:
 * Exposes JSON-RPC + Swagger UI over **HTTP 8080**
 * Uses **FastAPI + Uvicorn + bacpypes3**
 
-Be sure to check out these related projects that are designed to work hand-in-hand with the DIY BACnet Server as part of a smart-building edge microservice ecosystem 👇
 
-* **[diy-edge-lambda-agents](https://github.com/bbartling/diy-edge-lambda-agents)** — a collection of edge “Lambda-style” HVAC optimization agents designed to run on the DIY Edge Lambda Manager.
-* **[diy-edge-lambda-manager](https://github.com/bbartling/diy-edge-lambda-manager)** — a lightweight local IoT application that replicates AWS Lambda-style agent management for running Python automation agents on embedded-Linux edge devices.
+---
+
+Be sure to check out these related projects that are designed to work hand-in-hand as a **smart-building edge microservice ecosystem** 👇
+
+* **[diy-bacnet-server](https://github.com/bbartling/diy-bacnet-server)** — a lightweight FastAPI + bacpypes3 BACnet/IP server that exposes a JSON-RPC API for reading, writing, and supervising BACnet devices at the edge.
+* **[diy-edge-lambda-agents](https://github.com/bbartling/diy-edge-lambda-agents)** — a collection of edge “Lambda-style” HVAC optimization agents (optimal start, Guideline 36, FDD tools, testing agents, etc.) packaged as deployable ZIP workloads.
+* **[diy-edge-lambda-manager](https://github.com/bbartling/diy-edge-lambda-manager)** — a local “AWS Lambda-like” runtime for the edge that lets you upload, run, stop, and monitor agents via a clean FastAPI + Swagger UI, using real Linux subprocess execution under the hood.
+
+> Together, these projects form a **modular, production-ready edge automation platform**, ideal for real-world smart-building IoT deployments — supporting safe validation workflows today while scaling to advanced supervisory logic like **Guideline 36**, **Optimal Start**, and future analytics-driven control strategies.
 
 ---
 
