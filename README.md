@@ -4,15 +4,20 @@
 ![Swagger UI](https://github.com/bbartling/diy-bacnet-server/blob/develop/snip.png)
 
 
-This project provides a lightweight **BACnet/IP server** with a **JSON-RPC API**, designed to run cleanly as a **single Docker container** during development and early deployment.
+
+This project provides a lightweight **BACnet/IP server** with a **JSON-RPC API**, designed to run cleanly as a **single Docker-container microservice** for IoT applications. It also works great as an easy BACnet server deployment for any embedded-Linux project that supports Docker.
 
 The server:
 
 * Loads BACnet points from a **CSV file at startup**
 * Exposes BACnet/IP over **UDP 47808**
-* Exposes JSON-RPC / Swagger UI over **HTTP 8080**
+* Exposes JSON-RPC + Swagger UI over **HTTP 8080**
 * Uses **FastAPI + Uvicorn + bacpypes3**
 
+Be sure to check out these related projects that are designed to work hand-in-hand with the DIY BACnet Server as part of a smart-building edge microservice ecosystem 👇
+
+* **[diy-edge-lambda-agents](https://github.com/bbartling/diy-edge-lambda-agents)** — a collection of edge “Lambda-style” HVAC optimization agents designed to run on the DIY Edge Lambda Manager.
+* **[diy-edge-lambda-manager](https://github.com/bbartling/diy-edge-lambda-manager)** — a lightweight local IoT application that replicates AWS Lambda-style agent management for running Python automation agents on embedded-Linux edge devices.
 
 ---
 
@@ -226,21 +231,31 @@ If tests pass, rebuild the Docker image and launch the long-term server.
 **Note:** We add `--env PYTHONPATH=/app` to ensure Python finds the internal modules correctly.
 
 ```bash
-# Rebuild image
+# 1. Go to BACnet server repo
+cd ~/diy-bacnet-server
+
+# 2. Get latest code
+git pull
+
+# 3. Stop and remove old container (if running)
+docker stop bens-bacnet || true
+docker rm   bens-bacnet || true
+
+# 4. Rebuild image
 docker build -t diy-bacnet-server .
 
-# Run production container
+# 5. Start "production" container again
 docker run -d \
   --restart unless-stopped \
   --network host \
   --name bens-bacnet \
-  --env PYTHONPATH=/app \
   diy-bacnet-server \
   python3 -m bacpypes_server.main \
     --name BensServer \
     --instance 123456 \
     --debug \
     --public
+
 
 ```
 
@@ -262,15 +277,6 @@ Removes stopped containers, unused networks, and dangling images:
 docker system prune -f
 
 ```
-
-**Full Reset (⚠️ Destructive)**
-Removes **all** stopped containers, unused networks, and **all** unused images (including the one you just built):
-
-```bash
-docker system prune -a --volumes
-
-```
-
 
 ---
 
