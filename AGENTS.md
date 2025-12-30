@@ -1,197 +1,180 @@
-# DIY Edge Lambda — Agents Guide
+# AGENTS.md — DIY Edge Lambda Context
 
-## Overview
-
-This ecosystem provides a practical, local-first, docker-friendly platform for smart-building edge automation.
-
-* diy-bacnet-server
-  FastAPI + BACpypes3 BACnet/IP server exposing a JSON-RPC API for reading, writing, supervising BACnet devices at the edge.
-
-* diy-edge-lambda-manager
-  A local AWS-Lambda-style runtime for IoT edge. Upload Python agent bundles, run them as isolated OS processes, stop/restart them, monitor logs, all through Swagger UI.
-
-* diy-edge-lambda-agents
-  Developer toolkit and collection of ready-made agents. Build, package, and deploy optimization agents, testing tools, supervisory control bots, and FDD logic workloads.
-
-
-* **[diy-bacnet-server](https://github.com/bbartling/diy-bacnet-server)** — a lightweight FastAPI + bacpypes3 BACnet/IP server that exposes a JSON-RPC API for reading, writing, and supervising BACnet devices at the edge.
-* **[diy-edge-lambda-agents](https://github.com/bbartling/diy-edge-lambda-agents)** — a collection of edge “Lambda-style” HVAC optimization agents (optimal start, Guideline 36, FDD tools, testing agents, etc.) packaged as deployable ZIP workloads.
-* **[diy-edge-lambda-manager](https://github.com/bbartling/diy-edge-lambda-manager)** — a local “AWS Lambda-like” runtime for the edge that lets you upload, run, stop, and monitor agents via a clean FastAPI + Swagger UI, using real Linux subprocess execution under the hood.
-
-
-This stack enables serious automation at the building edge without cloud dependency. It is intended for real systems, lab environments, pilots, research, and production deployments.
+## 1. Project Identity & Scope
+Role: Building Automation Systems (BAS) Developer & IoT Architect.
+Platform: "DIY Edge Lambda" — A local-first, docker-friendly ecosystem for smart building automation.
+Distinction: While this mimics AWS Lambda's structure (handlers, zips), it runs locally on Linux edge devices (Raspberry Pi, etc.).
+Core Constraint: Do NOT use cloud libraries (AWS SDK/Boto3) unless explicitly requested. All hardware interaction happens via local HTTP JSON-RPC calls.
 
 ---
 
-## What is an Edge Agent?
+## 2. The "Edge Triad" Architecture
 
-An Agent is a packaged Python workload that runs independently on the edge:
+### A. Component Roles
+1.  DIY BACnet Server (The I/O Layer)
+    * Role: Speaks native BACnet/IP to physical equipment. Exposes a JSON-RPC 2.0 API via HTTP.
+    * Human Interface: Swagger UI (`/docs`). Engineers use this to discover points and test writes manually.
+    * Agent Interface: HTTP POST requests. Agents act as HTTP clients sending JSON-RPC envelopes.
 
-* packaged as a ZIP bundle
-* uploaded to the Edge Lambda Manager
-* executed as its own isolated Linux process
-* each agent runs with its own interpreter environment
-* supports multiple agents in parallel
-* logs are retrievable and viewable
-* can run for long-duration supervisory work
-* suitable for FDD, analytics, control strategies, testing tools, and experiments
+2.  DIY Edge Lambda Manager (The Runtime)
+    * Role: Manages the lifecycle (start/stop/log) of the agent processes.
+    * Port: 8000 (standard).
+
+3.  DIY Edge Lambda Agents (The Logic)
+    * Role: Python `subprocess` workloads.
+    * Constraint: Stateless logic loops. They read from the Server, calculate, and write back to the Server.
 
 ---
 
-## Agent Structure
+## 3. API & Data Access (JSON-RPC Protocol)
 
-Each agent lives in its own folder under `agents/`:
+CRITICAL IMPLEMENTATION DETAIL:
+Agents interact with the BACnet Server exclusively via JSON-RPC 2.0 over HTTP POST.
+The server exposes specific endpoints for each method (e.g., `/client_read_multiple`) to keep the API clean and discoverable via Swagger.
 
-```
+### A. The Request Envelope
+Every request from an agent must act as a JSON-RPC client.
+* Method: `POST`
+* Headers: `Content-Type: application/json`
+* Body Structure:
+    ```json
+    {
+      "jsonrpc": "2.0",
+      "id": "0",
+      "method": "<METHOD_NAME>",
+      "params": {
+         "request": { <ACTUAL_DATA_HERE> }
+      }
+    }
+    ```
+
+### B. Core Methods (The "Standard Library")
+*Reference these methods when writing agent logic:*
+
+#### 1. `client_read_multiple` (RPM)
+* Use for: Bulk telemetry (Sensors, Feedback).
+* Endpoint: `/client_read_multiple`
+* Params: `{"device_instance": int, "requests": [{"object_identifier": "analog-input,1", "property_identifier": "present-value"}, ...]}`
+
+#### 2. `client_write_property` (Commanding)
+* Use for: Changing setpoints or actuator positions.
+* Endpoint: `/client_write_property`
+* Params:
+    * `value`: The target value (number) or `"null"` (string) to release.
+    * `priority`: Required. 16 (sched), 12 (routine), 8 (safety).
+    * `property_identifier`: usually `"present-value"`.
+
+#### 3. `client_read_point_priority_array` (Arbitration)
+* Use for: Checking if a point is already overridden (Crucial for "Dueling Agents" and safe optimization).
+* Endpoint: `/client_read_point_priority_array`
+* Returns: A sparse array (dict) of current priorities (e.g., `{"16": 72.0, "8": "null"}`).
+
+#### 4. `client_whois_range` & `client_point_discovery`
+* Use for: Network scanning and auto-configuration agents.
+
+---
+
+## 3. Implementation Rules
+
+### A. Directory Structure
+Every agent must follow this exact layout:
+```text
 agents/
-  my_agent/
-    lambda_function.py
-    config.json
-    requirements.txt
-    dist/
+  {agent_name}/
+    ├── lambda_function.py    # The entry point
+    ├── config.json           # Configuration (IPs, Device IDs)
+    ├── requirements.txt      # Dependencies (keep light, usually just `requests`)
+    └── config.json.example   # Template for users
+
 ```
 
-### Required
+### B. The "Lambda" Pattern
 
-`lambda_function.py`
-Must provide:
+Even though we run forever, we respect the handler signature for compatibility.
 
 ```python
+# Standard Pattern
+import time
+import requests
+
+def loop_forever():
+    cfg = load_config()
+    while True:
+        # 1. Read Inputs (JSON-RPC)
+        # 2. Compute Logic
+        # 3. Write Outputs (JSON-RPC)
+        time.sleep(cfg['interval'])
+
 def handler(event=None, context=None):
-    ...
-```
-
-### Optional
-
-`config.json`
+    """Entry point required by the Manager."""
+    loop_forever()
 
 ```
-{
-  "bacnet_base_url": "http://YOUR_EDGE_SERVER:8080",
-  "interval_seconds": 15
-}
-```
 
-`requirements.txt`
-Standard Python dependency list.
+### C. Data Access (JSON-RPC)
+
+Never try to import `bacpypes3` directly in the agent. ALWAYS use `requests` to hit the BACnet Server.
+
+* Read Multiple (RPM):
+* Method: `client_read_multiple`
+* Use for bulk fetching telemetry (Temps, Setpoints).
+
+
+* Write with Priority:
+* Method: `client_write_property`
+* *Rule:* Always specify a priority level (usually 12-16 for auto, 8 for safety).
+* *Release:* To release an override, write value `"null"` (string).
+
+
 
 ---
 
-## Packaging and Deployment
+## 4. The "Dueling Agents" Testing Protocol
 
-Agents follow an AWS-style packaging approach:
+*Use this pattern when asked to validate system stability or test race conditions.*
 
-```
-pip install -r requirements.txt -t dist/
-copy lambda_function.py dist/
-cd dist
-zip -r my_agent.zip .
-```
+Concept: Two identical agents running in parallel that fight over a single setpoint.
+Goal: Verify the `priority-array` logic and `read/write` stability without crashing the server.
 
-Upload via:
+### The Logic Flow (The "Duel")
 
-* Edge Lambda Manager Swagger UI
-  or
-* HTTP API
+1. Target: A VAV Box (Zone Cooling Setpoint).
+2. Action A (Check): Read `priority-array` at level 12.
+3. Action B (Duel):
+* IF Priority 12 is *Occupied* (not null) -> WRITE "null" (Release).
+* IF Priority 12 is *Empty* (null) -> WRITE 70.0 (Claim).
 
-The Edge Manager runs each agent:
 
-* as a real OS subprocess
-* under real Linux scheduling
-* fully isolated
-* stable even when multiple workloads run concurrently
+4. Result: The setpoint constantly flips between `70.0` and `Default`.
+5. Telemetry: Simultaneously perform a `READ_MULTIPLE` on an AHU to generate background traffic load.
 
 ---
 
-## Docker Best Practices
+## 5. Development Workflow (Mental Sandbox)
 
-### Why Docker Matters
+### Packaging
 
-* predictable and reproducible builds
-* architecture correctness (especially ARM vs x86)
-* prevents dependency drift
-* isolates Python environments cleanly
-* ensures compatibility between development and deployment devices
-* supports multi-architecture images
-* avoids “works on my machine” issues
+* Do not hallucinate complex build pipelines.
+* Use the provided `pack_agent.py` script.
+* Command: `python pack_agent.py {agent_name}` -> outputs `dist/{agent_name}.zip`.
 
-### Multi-Architecture Builds
+### Configuration
 
-Example:
+* Hardcoding IPs is forbidden.
+* Always load `bacnet_base_url` from `config.json` or env var `BACNET_BASE_URL`.
 
-```
-docker buildx build \
-  --platform linux/amd64,linux/arm64 \
-  -t myagent:latest .
-```
+### Safety Rails
 
-Building agents inside Docker ensures bundled dependencies match:
-
-* target OS
-* target architecture
-* Python version
-
-If you build agents on Windows, WSL, or Mac, Docker ensures they deploy correctly on Raspberry Pi or other ARM edge systems.
+* Fail-Safe: Wrap the main loop in a `try/except` block. If a read fails, log it and `continue`. Do not let the process crash/exit.
+* Logging: Use standard `print()` or `logging`. The Manager captures stdout/stderr.
 
 ---
 
-## Example Applications
+## 6. Glossary
 
-This framework is appropriate for building:
-
-* Guideline 36 supervisory optimization logic
-* Optimal Start / Optimal Stop agents
-* HVAC energy optimization controllers
-* Fault Detection and Diagnostics tools
-* Safety / watchdog supervisory agents
-* BACnet testing and validation bots
-* simulation or research agents
-* “chaos testing” workloads
-* cybersecurity monitoring agents
-* production optimization intelligence
-
----
-
-## Design Philosophy
-
-The system is designed to be:
-
-* local-first
-* resilient
-* transparent
-* open
-* flexible
-* suitable for both engineers and researchers
-* straightforward to extend
-
-It intentionally removes vendor lock-in and provides a practical way to innovate directly on the building edge.
-
----
-
-## Future Possibilities
-
-* agent templates / scaffolding tools
-* historical logging and analytics backend
-* built-in ML agent support
-* distributed multi-building coordination
-* automated deployment workflows
-* curated public agent library
-* additional reference HVAC optimization agents
-
----
-
-## Community Direction
-
-This ecosystem is intended to help:
-
-* BAS engineers
-* system integrators
-* energy researchers
-* software developers
-* students and innovators
-
-It provides an open platform for experimentation, learning, and professional deployment of modern building intelligence.
-
-If you build useful agents or improvements, please consider sharing them.
-
+* RPM: Read Property Multiple (High efficiency reading).
+* COV: Change of Value (Avoid polling if possible, but polling is standard for these agents).
+* Priority 12: Standard "Normal Operation" override slot.
+* Priority 8: "Manual/Safety" override slot (High priority).
+* Null: The specific JSON value sent to "release" a BACnet override.
 
