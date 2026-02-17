@@ -21,7 +21,7 @@ from bacpypes_server.client_utils import (
     read_point_priority_arr,
     perform_who_is_router_to_network,
 )
-from bacpypes_server.rdf_scan import discovery_to_rdf
+from bacpypes_server.rdf_scan import discovery_to_rdf, discovery_to_rdf_one_device
 from bacpypes_server.server_utils import (
     point_map,
     commandable_point_names,
@@ -47,6 +47,7 @@ from bacpypes3.primitivedata import ObjectIdentifier
 
 import fastapi_jsonrpc as jsonrpc
 import logging
+import traceback
 
 
 logger = logging.getLogger("rpc_methods")
@@ -314,9 +315,8 @@ async def client_whois_router_to_network() -> BaseResponse:
 async def client_discovery_to_rdf(request: DeviceInstanceRange) -> dict:
     """
     Deep scan: Who-Is in range, then for each device read object-list and key
-    properties (name, description, present-value, units, reliability,
-    out-of-service, priority-array). Build RDF with bacpypes3 BACnetGraph,
-    return TTL string and summary. For Open-FDD / BRICK merge. Requires rdflib.
+    properties. Build RDF, return TTL + summary. Can be slow for large ranges;
+    prefer client_discovery_to_rdf_device for one device at a time.
     """
     try:
         result = await discovery_to_rdf(
@@ -331,5 +331,32 @@ async def client_discovery_to_rdf(request: DeviceInstanceRange) -> dict:
             )
         raise WhoIsFailureError(data={"detail": str(e)})
     except Exception as e:
-        logger.error(f"Discovery-to-RDF failed: {e}")
+        logger.exception("Discovery-to-RDF failed")
+        raise WhoIsFailureError(
+            data={"detail": f"{e!s}\n{traceback.format_exc()}"}
+        )
+
+
+@rpc.method()
+async def client_discovery_to_rdf_device(instance: DeviceInstanceOnly) -> dict:
+    """
+    Deep scan a single device (same param shape as client_point_discovery).
+    Who-Is for that device_instance only, then object-list + key properties,
+    build RDF, return TTL + summary. Fast for one device; use this instead of
+    client_discovery_to_rdf when scanning per device.
+    Params: {"instance": {"device_instance": 3456789}}
+    """
+    try:
+        result = await discovery_to_rdf_one_device(instance.device_instance)
+        return result
+    except RuntimeError as e:
+        if "rdflib" in str(e):
+            raise WhoIsFailureError(
+                data={"detail": str(e) + ". Install: pip install rdflib"}
+            )
         raise WhoIsFailureError(data={"detail": str(e)})
+    except Exception as e:
+        logger.exception("Discovery-to-RDF (one device) failed")
+        raise WhoIsFailureError(
+            data={"detail": f"{e!s}\n{traceback.format_exc()}"}
+        )

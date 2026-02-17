@@ -54,6 +54,7 @@ def test_rpc_entrypoint_has_methods():
         "client_supervisory_logic_checks",
         "client_whois_router_to_network",
         "client_discovery_to_rdf",
+        "client_discovery_to_rdf_device",
     }:
         assert expected in method_names
 

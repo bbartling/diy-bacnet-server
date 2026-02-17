@@ -39,6 +39,15 @@ def set_app(application):
     app = application
 
 
+def _require_app():
+    """Raise a clear error if BACnet stack (app) is not initialized."""
+    if app is None:
+        raise RuntimeError(
+            "BACnet stack not initialized (app is None). "
+            "Start the server with BACnet stack enabled (e.g. run main.py with adapter config)."
+        )
+
+
 def _convert_to_address(address: str) -> Address:
     """
     Convert a string to a BACnet Address object.
@@ -246,7 +255,7 @@ async def bacnet_rpm(
 
 
 async def perform_who_is(start_instance: int, end_instance: int):
-
+    _require_app()
     i_ams = await app.who_is(start_instance, end_instance)
     if not i_ams:
         no_response_str = f"No response(s) on WhoIs start_instance {start_instance} end_instance {end_instance}"
@@ -289,6 +298,7 @@ async def perform_who_is(start_instance: int, end_instance: int):
 async def point_discovery(
     instance_id: Optional[int] = None,
 ) -> dict:
+    _require_app()
     try:
         i_ams = await app.who_is(instance_id, instance_id)
         if not i_ams:
@@ -318,12 +328,14 @@ async def point_discovery(
                 logger.error(f"Abort reading object-list: {err}")
             return {
                 "device_address": str(device_address),
+                "device_instance": instance_id,
                 "objects": [],
             }
         except ErrorRejectAbortNack as err:
             logger.error(f"Error reading object-list: {err}")
             return {
                 "device_address": str(device_address),
+                "device_instance": instance_id,
                 "objects": [],
             }
 
@@ -345,6 +357,7 @@ async def point_discovery(
                 logger.error(f"Error reading object-list length: {err}")
                 return {
                     "device_address": str(device_address),
+                    "device_instance": instance_id,
                     "objects": [],
                 }
 
@@ -362,6 +375,7 @@ async def point_discovery(
 
         return {
             "device_address": str(device_address),
+            "device_instance": instance_id,
             "objects": [
                 {"object_identifier": str(oid), "name": name}
                 for oid, name in zip(object_list, names_list)
