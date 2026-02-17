@@ -17,4 +17,4 @@ COPY . /app
 EXPOSE 47808/udp
 EXPOSE 5000
 
-CMD ["python3", "-u", "bacpypes_server/main.py", "--name", "BensServer", "--instance", "123456", "--public"]
+CMD ["python3", "-u", "-m", "bacpypes_server.main", "--name", "BensServer", "--instance", "123456", "--public"]

@@ -295,6 +295,10 @@ http://localhost:8080/docs
 curl http://localhost:8080/openapi.json
 ```
 
+### RDF discovery (BRICK / Open-FDD)
+
+The method **`client_discovery_to_rdf`** runs a deep scan (Who-Is + object-list + key properties), builds an RDF graph with bacpypes3’s `BACnetGraph`, and returns a **TTL** string plus summary. For integration with Open-FDD and BRICK, so BACnet topology can be merged into a single semantic model. Requires `rdflib` (`pip install rdflib`). See Open-FDD’s `docs/bacnet-rdf-and-brick.md` for architecture and merge strategy.
+
 ---
 
 ## 🔄 Workflow: Updating Sensor Data On BACnet Server
@@ -404,7 +408,7 @@ python3 -m venv env
 . ./env/bin/activate
 pip install -r ./requirements.txt
 
-pytest
+pytest tests/ -v
 ```
 
 ---

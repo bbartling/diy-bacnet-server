@@ -1,7 +1,9 @@
 bacpypes3
+rdflib  # optional for RDF discovery; required for client_discovery_to_rdf
 ifaddr
 fastapi-jsonrpc
 uvicorn
 black
 pytest-asyncio
 requests
+httpx

@@ -1,10 +1,10 @@
 from pydantic import (
+    ConfigDict,
     RootModel,
     BaseModel,
     StrictBool,
     conint,
     confloat,
-    conint,
     Field,
     ValidationError,
     field_validator,
@@ -14,6 +14,26 @@ from typing import Dict, Union, Optional, List
 from bacpypes3.primitivedata import PropertyIdentifier, ObjectType
 from fastapi import HTTPException
 import math
+
+
+def parse_object_identifier_parts(value: str) -> tuple[str, int]:
+    """
+    Parse 'objectType,instanceNumber' and return (object_type, instance).
+    Raises ValueError if format or values are invalid.
+    """
+    if "," not in value:
+        raise ValueError("Must be in the format objectType,instanceNumber")
+    object_type, instance_str = value.split(",", 1)
+    object_type = object_type.strip()
+    if object_type not in ObjectType._enum_map:
+        raise ValueError(f"Invalid object type: {object_type}")
+    try:
+        instance = int(instance_str.strip())
+    except ValueError:
+        raise ValueError("Instance number must be an integer")
+    if not (0 <= instance <= 4194303):
+        raise ValueError("Instance out of range")
+    return object_type, instance
 
 
 class PointUpdate(
@@ -51,24 +71,24 @@ class SupervisorySummary(BaseModel):
 
 
 class DeviceInstanceOnly(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"example": {"device_instance": 987654}})
+
     device_instance: conint(ge=0, le=4194303) = Field(
         ..., description="Single BACnet device instance (0–4194303)"
     )
 
-    class Config:
-        json_schema_extra = {"example": {"device_instance": 987654}}
-
 
 class DeviceInstanceRange(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"start_instance": 1000, "end_instance": 1010}}
+    )
+
     start_instance: conint(ge=0, le=4194303) = Field(
         ..., description="Start of the instance scan range"
     )
     end_instance: conint(ge=0, le=4194303) = Field(
         ..., description="End of the instance scan range"
     )
-
-    class Config:
-        json_schema_extra = {"example": {"start_instance": 1000, "end_instance": 1010}}
 
 
 class DeviceInstanceValidator(BaseModel):
@@ -111,21 +131,11 @@ class WritePropertyRequest(BaseModel):
     @field_validator("object_identifier")
     @classmethod
     def validate_object_identifier(cls, v):
-        if "," not in v:
-            raise ValueError("Must be in the format objectType,instanceNumber")
-        object_type, instance_str = v.split(",", 1)
-        if object_type not in ObjectType._enum_map:
-            raise ValueError(f"Invalid object type: {object_type}")
-        try:
-            instance = int(instance_str)
-            if not (0 <= instance <= 4194303):
-                raise ValueError("Instance out of range")
-        except Exception:
-            raise ValueError("Instance number must be integer")
+        parse_object_identifier_parts(v)
         return v
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "device_instance": 987654,
                 "object_identifier": "analog-output,1",
@@ -134,6 +144,7 @@ class WritePropertyRequest(BaseModel):
                 "priority": 1,
             }
         }
+    )
 
 
 class ReadMultiplePropertiesRequest(BaseModel):
@@ -147,15 +158,7 @@ class ReadMultiplePropertiesRequest(BaseModel):
     @field_validator("object_identifier")
     @classmethod
     def validate_object_identifier(cls, v):
-        if "," not in v:
-            raise ValueError("Must be in the format objectType,instanceNumber")
-        object_type, instance_str = v.split(",", 1)
-        if object_type not in ObjectType._enum_map:
-            raise ValueError(f"Invalid object type: {object_type}")
-        try:
-            int(instance_str)
-        except Exception:
-            raise ValueError("Instance number must be integer")
+        parse_object_identifier_parts(v)
         return v
 
     @field_validator("property_identifier")
@@ -165,23 +168,19 @@ class ReadMultiplePropertiesRequest(BaseModel):
             raise ValueError(f"Invalid property identifier: {v}")
         return v
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "object_identifier": "analog-input,2",
                 "property_identifier": "present-value",
             }
         }
+    )
 
 
 class ReadMultiplePropertiesRequestWrapper(BaseModel):
-    device_instance: conint(ge=0, le=4194303) = Field(
-        ..., description="BACnet device instance (0-4194303)"
-    )
-    requests: List[ReadMultiplePropertiesRequest]
-
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "device_instance": 123456,
                 "requests": [
@@ -196,6 +195,12 @@ class ReadMultiplePropertiesRequestWrapper(BaseModel):
                 ],
             }
         }
+    )
+
+    device_instance: conint(ge=0, le=4194303) = Field(
+        ..., description="BACnet device instance (0-4194303)"
+    )
+    requests: List[ReadMultiplePropertiesRequest]
 
 
 class SingleReadRequest(BaseModel):
@@ -210,15 +215,7 @@ class SingleReadRequest(BaseModel):
     @field_validator("object_identifier")
     @classmethod
     def validate_object_identifier(cls, v):
-        if "," not in v:
-            raise ValueError("Must be in the format objectType,instanceNumber")
-        object_type, instance_str = v.split(",", 1)
-        if object_type not in ObjectType._enum_map:
-            raise ValueError(f"Invalid object type: {object_type}")
-        try:
-            int(instance_str)
-        except Exception:
-            raise ValueError("Instance number must be integer")
+        parse_object_identifier_parts(v)
         return v
 
     @field_validator("property_identifier")
@@ -228,14 +225,15 @@ class SingleReadRequest(BaseModel):
             raise ValueError(f"Invalid property identifier: {v}")
         return v
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "device_instance": 987654,
                 "object_identifier": "analog-output,1",
                 "property_identifier": "present-value",
             }
         }
+    )
 
 
 class ReadPriorityArrayRequest(BaseModel):
@@ -249,21 +247,14 @@ class ReadPriorityArrayRequest(BaseModel):
     @field_validator("object_identifier")
     @classmethod
     def validate_object_identifier(cls, v):
-        if "," not in v:
-            raise ValueError("Must be in the format objectType,instanceNumber")
-        object_type, instance_str = v.split(",", 1)
-        if object_type not in ObjectType._enum_map:
-            raise ValueError(f"Invalid object type: {object_type}")
-        try:
-            int(instance_str)
-        except Exception:
-            raise ValueError("Instance number must be an integer")
+        parse_object_identifier_parts(v)
         return v
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "device_instance": 987654,
                 "object_identifier": "analog-output,1",
             }
         }
+    )

@@ -8,6 +8,7 @@ from bacpypes_server.models import (
     DeviceInstanceOnly,
     ReadPriorityArrayRequest,
     SupervisorySummary,
+    parse_object_identifier_parts,
 )
 from bacpypes_server.client_utils import (
     bacnet_read,
@@ -20,6 +21,7 @@ from bacpypes_server.client_utils import (
     read_point_priority_arr,
     perform_who_is_router_to_network,
 )
+from bacpypes_server.rdf_scan import discovery_to_rdf
 from bacpypes_server.server_utils import (
     point_map,
     commandable_point_names,
@@ -54,11 +56,9 @@ rpc = jsonrpc.Entrypoint("")
 
 
 def parse_object_identifier(oid_str: str) -> ObjectIdentifier:
-    try:
-        obj_type, obj_inst = oid_str.split(",")
-        return ObjectIdentifier((obj_type.strip(), int(obj_inst.strip())))
-    except Exception as e:
-        raise ValueError(f"Invalid object_identifier format: {oid_str}")
+    """Parse 'objectType,instanceNumber' into a BACnet ObjectIdentifier (reuses models validation)."""
+    obj_type, obj_inst = parse_object_identifier_parts(oid_str)
+    return ObjectIdentifier((obj_type, obj_inst))
 
 
 @rpc.method()
@@ -307,4 +307,29 @@ async def client_whois_router_to_network() -> BaseResponse:
         )
     except Exception as e:
         logger.error(f"Who-Is-Router-To-Network failed: {e}")
+        raise WhoIsFailureError(data={"detail": str(e)})
+
+
+@rpc.method()
+async def client_discovery_to_rdf(request: DeviceInstanceRange) -> dict:
+    """
+    Deep scan: Who-Is in range, then for each device read object-list and key
+    properties (name, description, present-value, units, reliability,
+    out-of-service, priority-array). Build RDF with bacpypes3 BACnetGraph,
+    return TTL string and summary. For Open-FDD / BRICK merge. Requires rdflib.
+    """
+    try:
+        result = await discovery_to_rdf(
+            start_instance=request.start_instance,
+            end_instance=request.end_instance,
+        )
+        return result
+    except RuntimeError as e:
+        if "rdflib" in str(e):
+            raise WhoIsFailureError(
+                data={"detail": str(e) + ". Install: pip install rdflib"}
+            )
+        raise WhoIsFailureError(data={"detail": str(e)})
+    except Exception as e:
+        logger.error(f"Discovery-to-RDF failed: {e}")
         raise WhoIsFailureError(data={"detail": str(e)})

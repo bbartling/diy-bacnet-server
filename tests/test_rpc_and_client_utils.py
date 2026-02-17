@@ -1,8 +1,8 @@
-import asyncio
 import inspect
 
 import pytest
 
+from bacpypes_server.models import DeviceInstanceRange
 import bacpypes_server.rpc_methods as rpc_methods
 import bacpypes_server.client_utils as client_utils
 
@@ -53,6 +53,7 @@ def test_rpc_entrypoint_has_methods():
         "client_read_point_priority_array",
         "client_supervisory_logic_checks",
         "client_whois_router_to_network",
+        "client_discovery_to_rdf",
     }:
         assert expected in method_names
 
@@ -74,12 +75,7 @@ async def test_perform_who_is_wrapper_does_not_crash(monkeypatch):
         rpc_methods, "perform_who_is", fake_perform_who_is, raising=True
     )
 
-    # Build a minimal pydantic request model
-    # Build a minimal pydantic request model
-    req = rpc_methods.DeviceInstanceRange(
-        start_instance=0,
-        end_instance=4194303,
-    )
+    req = DeviceInstanceRange(start_instance=0, end_instance=4194303)
 
 
     response = await rpc_methods.client_whois_range(req)
@@ -103,3 +99,48 @@ def test_client_utils_has_expected_public_api():
     }:
         assert hasattr(client_utils, func_name)
         assert inspect.iscoroutinefunction(getattr(client_utils, func_name))
+
+
+# --- More RPC methods with mocked BACnet (no live network) ---
+
+
+@pytest.mark.asyncio
+async def test_client_read_property_mocked(monkeypatch):
+    """client_read_property with mocked bacnet_read returns result."""
+    from bacpypes_server.models import SingleReadRequest
+
+    async def fake_bacnet_read(*args, **kwargs):
+        return {"present-value": 72.5}
+
+    monkeypatch.setattr(rpc_methods, "bacnet_read", fake_bacnet_read, raising=True)
+    req = SingleReadRequest(
+        device_instance=3456789,
+        object_identifier="analog-value,1",
+        property_identifier="present-value",
+    )
+    result = await rpc_methods.client_read_property(req)
+    assert result == {"present-value": 72.5}
+
+
+@pytest.mark.asyncio
+async def test_client_point_discovery_mocked(monkeypatch):
+    """client_point_discovery with mocked point_discovery returns devices and objects."""
+    from bacpypes_server.models import DeviceInstanceOnly
+
+    async def fake_point_discovery(instance_id: int):
+        return {
+            "device_instance": instance_id,
+            "device_description": "Fake AHU",
+            "objects": [
+                {"object_identifier": "analog-value,1", "object_name": "AV-1"},
+                {"object_identifier": "analog-value,2", "object_name": "SAT-SP"},
+            ],
+        }
+
+    monkeypatch.setattr(rpc_methods, "point_discovery", fake_point_discovery, raising=True)
+    req = DeviceInstanceOnly(device_instance=3456789)
+    response = await rpc_methods.client_point_discovery(req)
+    assert response.success is True
+    assert response.data["device_instance"] == 3456789
+    assert len(response.data["objects"]) == 2
+    assert response.data["objects"][0]["object_identifier"] == "analog-value,1"

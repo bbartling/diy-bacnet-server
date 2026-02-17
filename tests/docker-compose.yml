@@ -1,4 +1,5 @@
-version: '3'
+# No 'version' key (obsolete in Compose V2).
+# Uses host port 18080 so tests don't fail when something else is on 8080.
 services:
   bacnet-server:
     build:
@@ -12,10 +13,7 @@ services:
     stdin_open: true
     tty: true
     environment:
-      # FIX: Add this line so Python can find the 'bacpypes_server' package
       PYTHONPATH: /app
-      
-      # Optional override for CSV path
       HVAC_SERVER_POINTS_CSV: /app/hvac_server_points.csv
     command: >
       python3 -u bacpypes_server/main.py
@@ -23,8 +21,8 @@ services:
         --instance 987654
         --public
     ports:
-      - "8080:8080"
-      - "47808:47808/udp"
+      - "18080:8080"
+      - "47809:47808/udp"
 
 networks:
   bacnet-network:

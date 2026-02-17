@@ -19,9 +19,8 @@ from bacpypes3.json.util import (
     sequence_to_json,
     extendedlist_to_json_list,
 )
-from bacpypes3.primitivedata import Null
+from bacpypes3.primitivedata import Null, ObjectIdentifier
 from bacpypes3.pdu import Address
-from bacpypes3.primitivedata import ObjectIdentifier
 from bacpypes3.netservice import NetworkAdapter
 from bacpypes3.npdu import IAmRouterToNetwork
 
