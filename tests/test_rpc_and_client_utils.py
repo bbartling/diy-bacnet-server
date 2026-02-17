@@ -2,7 +2,7 @@ import inspect
 
 import pytest
 
-from bacpypes_server.models import DeviceInstanceRange
+from bacpypes_server.models import DeviceInstanceOnly, DeviceInstanceRange
 import bacpypes_server.rpc_methods as rpc_methods
 import bacpypes_server.client_utils as client_utils
 
@@ -145,3 +145,54 @@ async def test_client_point_discovery_mocked(monkeypatch):
     assert response.data["device_instance"] == 3456789
     assert len(response.data["objects"]) == 2
     assert response.data["objects"][0]["object_identifier"] == "analog-value,1"
+
+
+# --- Discovery-to-RDF RPCs (same code path: range = Who-Is range then loop; device = single Who-Is) ---
+
+
+_MINIMAL_TTL = """@prefix bacnet: <http://data.ashrae.org/bacnet/2020#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+<bacnet://3456789> a bacnet:Device .
+"""
+
+
+@pytest.mark.asyncio
+async def test_client_discovery_to_rdf_mocked(monkeypatch):
+    """client_discovery_to_rdf with mocked discovery_to_rdf returns ttl + summary."""
+    async def fake_discovery_to_rdf(start_instance: int, end_instance: int):
+        return {
+            "ttl": _MINIMAL_TTL,
+            "summary": {"devices": 1, "objects": 3},
+        }
+
+    monkeypatch.setattr(rpc_methods, "discovery_to_rdf", fake_discovery_to_rdf, raising=True)
+    req = DeviceInstanceRange(start_instance=3456789, end_instance=3456790)
+    result = await rpc_methods.client_discovery_to_rdf(req)
+    assert isinstance(result, dict)
+    assert "ttl" in result
+    assert "summary" in result
+    assert result["summary"]["devices"] == 1
+    assert result["summary"]["objects"] == 3
+    assert "bacnet:Device" in result["ttl"]
+
+
+@pytest.mark.asyncio
+async def test_client_discovery_to_rdf_device_mocked(monkeypatch):
+    """client_discovery_to_rdf_device with mocked discovery_to_rdf_one_device returns ttl + summary."""
+    async def fake_discovery_to_rdf_one_device(device_instance: int):
+        return {
+            "ttl": _MINIMAL_TTL,
+            "summary": {"devices": 1, "objects": 19},
+        }
+
+    monkeypatch.setattr(
+        rpc_methods, "discovery_to_rdf_one_device", fake_discovery_to_rdf_one_device, raising=True
+    )
+    req = DeviceInstanceOnly(device_instance=3456789)
+    result = await rpc_methods.client_discovery_to_rdf_device(req)
+    assert isinstance(result, dict)
+    assert "ttl" in result
+    assert "summary" in result
+    assert result["summary"]["devices"] == 1
+    assert result["summary"]["objects"] == 19
+    assert "<bacnet://3456789>" in result["ttl"]
