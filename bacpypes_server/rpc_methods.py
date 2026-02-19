@@ -14,6 +14,7 @@ from bacpypes_server.client_utils import (
     bacnet_read,
     bacnet_write,
     bacnet_rpm,
+    RPM_CHUNK_SIZE,
     perform_who_is,
     get_device_address,
     point_discovery,
@@ -200,22 +201,26 @@ async def client_read_multiple(
             data={"instance": request.device_instance, "detail": str(e)}
         )
 
-    args = []
-    for r in request.requests:
-        args.append(r.object_identifier)
-        args.append(r.property_identifier)
+    # Chunk requests to stay under APDU/MTU limits (avoids crashes on large reads)
+    combined: list = []
+    for i in range(0, len(request.requests), RPM_CHUNK_SIZE):
+        chunk = request.requests[i : i + RPM_CHUNK_SIZE]
+        args = []
+        for r in chunk:
+            args.append(r.object_identifier)
+            args.append(r.property_identifier)
+        try:
+            result = await bacnet_rpm(address, *args)
+            combined.extend(result)
+        except Exception as e:
+            logger.error(f"RPM chunk failed: {e}")
+            raise RPMError(data={"instance": request.device_instance, "detail": str(e)})
 
-    try:
-        result = await bacnet_rpm(address, *args)
-        return BaseResponse(
-            success=True,
-            message="Read Multiple complete",
-            data={"results": result},
-        )
-    except Exception as e:
-        logger.error(f"RPM failed: {e}")
-        # Still a generic error here — can define RPMError later if needed
-        raise RPMError(data={"instance": request.device_instance, "detail": str(e)})
+    return BaseResponse(
+        success=True,
+        message="Read Multiple complete",
+        data={"results": combined},
+    )
 
 
 @rpc.method()

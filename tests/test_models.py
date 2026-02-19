@@ -11,6 +11,7 @@ from bacpypes_server.models import (
     ReadMultiplePropertiesRequest,
     ReadMultiplePropertiesRequestWrapper,
     ReadPriorityArrayRequest,
+    parse_object_identifier_parts,
 )
 
 
@@ -124,3 +125,22 @@ def test_read_priority_array_request_valid():
         object_identifier="analog-output,1",
     )
     assert r.object_identifier == "analog-output,1"
+
+
+def test_bacpypes3_object_identifier_formats():
+    """BACpypes3 uses ObjectType enum; standard hyphenated names (e.g. analog-value) work. No app-side conversion needed."""
+    # Standard hyphenated format (BACnet / bacpypes3 recommended)
+    typ, inst = parse_object_identifier_parts("analog-value,1")
+    assert typ == "analog-value"
+    assert inst == 1
+    typ, inst = parse_object_identifier_parts("binary-output,1")
+    assert typ == "binary-output"
+    assert inst == 1
+    # ObjectIdentifier from parsed parts (bacpypes3 accepts tuple from ObjectType)
+    from bacpypes3.primitivedata import ObjectIdentifier
+
+    oid = ObjectIdentifier(("analog-value", 1))
+    assert oid is not None
+    # String form: bacpypes3 accepts "object-type,instance" (hyphenated)
+    oid_from_str = ObjectIdentifier("analog-value,1")
+    assert oid_from_str is not None

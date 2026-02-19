@@ -30,6 +30,8 @@ import logging
 
 logger = logging.getLogger("client_utils")
 
+# Chunk size for Read-Property-Multiple to stay under typical APDU/MTU limits
+RPM_CHUNK_SIZE = 25
 
 app = None  # will be set from main.py
 
@@ -254,6 +256,36 @@ async def bacnet_rpm(
     return result_list
 
 
+async def bacnet_rpm_chunked(
+    address: Address,
+    requests: List[Tuple[str, str]],
+    chunk_size: int = RPM_CHUNK_SIZE,
+) -> List[dict]:
+    """
+    Run Read-Property-Multiple in chunks to avoid APDU length limits.
+    Each request is (object_identifier, property_identifier).
+    Returns combined result list in the same order as requests (one or more
+    result entries per request depending on property).
+    """
+    if not requests:
+        return []
+    combined: List[dict] = []
+    for i in range(0, len(requests), chunk_size):
+        chunk = requests[i : i + chunk_size]
+        args = []
+        for obj_id, prop_id in chunk:
+            args.append(obj_id)
+            args.append(prop_id)
+        try:
+            result = await bacnet_rpm(address, *args)
+            combined.extend(result)
+        except Exception as e:
+            logger.warning(f"RPM chunk failed (chunk size {len(chunk)}): {e}")
+            for _ in chunk:
+                combined.append({"error": str(e)})
+    return combined
+
+
 async def perform_who_is(start_instance: int, end_instance: int):
     _require_app()
     i_ams = await app.who_is(start_instance, end_instance)
@@ -373,11 +405,26 @@ async def point_discovery(
                 logger.warning(f"Error reading name for {obj_id}: {err}")
                 names_list.append("ERROR - Delete this row")
 
+        # Commandable (writable) = read 'priority-array'; if it exists then writeable, else read-only
+        commandable_oids: set = set()
+        try:
+            rpm_requests = [(str(oid), "priority-array") for oid, _ in zip(object_list, names_list)]
+            rpm_results = await bacnet_rpm_chunked(device_address, rpm_requests)
+            for r in rpm_results:
+                if "error" not in r:
+                    commandable_oids.add(str(r.get("object_identifier", "")).strip())
+        except Exception as err:
+            logger.debug(f"Priority-array batch read failed (commandable all False): {err}")
+
         return {
             "device_address": str(device_address),
             "device_instance": instance_id,
             "objects": [
-                {"object_identifier": str(oid), "name": name}
+                {
+                    "object_identifier": str(oid),
+                    "name": name,
+                    "commandable": str(oid).strip() in commandable_oids,
+                }
                 for oid, name in zip(object_list, names_list)
             ],
         }
@@ -431,26 +478,6 @@ async def read_point_priority_arr(
     return None
 
 
-def normalize_object_type(bacnet_type: str) -> str:
-    """
-    Convert 'analog-value' or 'binary-output' → 'analogValue', 'binaryOutput', etc.
-    """
-    parts = bacnet_type.split("-")
-    return parts[0] + "".join(p.capitalize() for p in parts[1:])
-
-
-def supports_priority_array(obj_type: str) -> bool:
-    normalized = normalize_object_type(obj_type)
-    return normalized in {
-        "analogOutput",
-        "binaryOutput",
-        "analogValue",
-        "binaryValue",
-        "multiStateOutput",
-        "multiStateValue",
-    }
-
-
 async def supervisory_logic_check(instance_id: int) -> dict:
     total_points = 0
     points_with_priority_array = 0
@@ -479,6 +506,32 @@ async def supervisory_logic_check(instance_id: int) -> dict:
         logger.info(f"Found {len(objects)} points for device {instance_id}")
 
         points = []
+        name_by_oid = {obj["object_identifier"]: obj["name"] for obj in objects}
+
+        # Chunked priority-array read for all commandable points (writeable = priority-array existed in discovery)
+        commandable_list = [
+            (obj["object_identifier"], obj["name"])
+            for obj in objects
+            if obj.get("commandable", False)
+        ]
+        by_oid: dict = {}
+        if commandable_list:
+            try:
+                rpm_requests = [(oid, "priority-array") for oid, _ in commandable_list]
+                rpm_results = await bacnet_rpm_chunked(
+                    Address(device_address), rpm_requests
+                )
+                for r in rpm_results:
+                    if "error" in r:
+                        continue
+                    oid = str(r.get("object_identifier", "")).strip()
+                    idx = r.get("property_array_index", 0)
+                    val = r.get("value")
+                    by_oid.setdefault(oid, []).append((idx, val))
+                for oid in by_oid:
+                    by_oid[oid].sort(key=lambda x: x[0])
+            except Exception as e:
+                logger.warning(f"Chunked priority-array read failed: {e}")
 
         for obj in objects:
             obj_type, obj_inst = obj["object_identifier"].split(",")
@@ -486,48 +539,38 @@ async def supervisory_logic_check(instance_id: int) -> dict:
             point_name = obj["name"]
             total_points += 1
 
-            if not supports_priority_array(obj_type):
+            if not obj.get("commandable", False):
                 points_without_priority_array += 1
-                logger.debug(f"⏩ {object_id} does not support priority array.")
                 continue
 
-            try:
-                priority_array = await read_point_priority_arr(
-                    Address(device_address), object_id
-                )
+            priority_slots = by_oid.get(obj["object_identifier"], [])
+            if not priority_slots:
+                points_without_priority_array += 1
+                logger.info(f"No priority array for {object_id}")
+                continue
 
-                if not priority_array:
-                    points_without_priority_array += 1
-                    logger.info(f"No priority array for {object_id}")
+            points_with_priority_array += 1
+            for idx, value in priority_slots:
+                if value is None or (isinstance(value, str) and (value == "null" or value.startswith("Error:"))):
                     continue
-
-                points_with_priority_array += 1
-
-                for idx, item in enumerate(priority_array):
-                    if item.get("type") != "null":
-                        value = item["value"]
-                        value_str = {
-                            "data_as_float": float(value),
-                            "raw_data_type": value,
-                        }
-                        points.append(
-                            {
-                                "priority_level": idx + 1,
-                                "object_identifier": str(object_id),
-                                "object_name": point_name,
-                                "type": item["type"],
-                                "value": value_str,
-                            }
-                        )
-
-            except Exception as e:
-                msg = f"Error processing {object_id} ({point_name}): {e}"
-                if "unknown-property" in str(e):
-                    logger.debug(msg)
-                    points_without_priority_array += 1
-                else:
-                    logger.warning(msg)
-                continue
+                try:
+                    data_as_float = float(value)
+                except (TypeError, ValueError):
+                    data_as_float = value
+                value_str = {
+                    "data_as_float": data_as_float,
+                    "raw_data_type": value,
+                }
+                type_name = "real" if isinstance(value, (int, float)) else type(value).__name__
+                points.append(
+                    {
+                        "priority_level": idx + 1,
+                        "object_identifier": str(object_id),
+                        "object_name": point_name,
+                        "type": type_name,
+                        "value": value_str,
+                    }
+                )
 
         logger.info("=" * 40)
         logger.info(f"Summary for device {instance_id}:")
