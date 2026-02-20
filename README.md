@@ -184,6 +184,31 @@ Use `--restart unless-stopped` to ensure reliability. This tells Docker to **aut
 
 ---
 
+## BACnet client features
+
+The server can act as a **BACnet client** to other devices on the network. These JSON-RPC methods let you discover devices, read/write points, and inspect overrides. Each method is one HTTP POST; some trigger multiple BACnet transactions under the hood.
+
+* **`client_whois_range`** — Who-Is over the given instance range. **Returns:** list of devices (I-Am responses: address, description, vendor, etc.). **Under the hood:** one Who-Is broadcast; one Read Property (description) per device that responds.
+
+* **`client_whois_router_to_network`** — Who-Is-Router-To-Network. **Returns:** list of routers and their networks. **Under the hood:** one broadcast; responses list which networks each router can reach.
+
+* **`client_read_property`** — Read a single property on one object (e.g. `present-value`, `priority-array`). **Returns:** `{ "<property_identifier>": <encoded value> }` (e.g. `{"priority-array": [{"null": []}, ..., {"real": 55}]}`). **Under the hood:** one Read Property. Returns 400 with a clear message if the property is unsupported (e.g. `priority-array` on an analog-input).
+
+* **`client_write_property`** — Write a value to a property, optionally at a given priority (for commandable points). **Returns:** `{ "status": "success", "response": "..." }`. **Under the hood:** one Write Property. Use priority and `"null"` to release an override.
+
+* **`client_read_multiple`** — Read multiple (object, property) pairs in one call. **Returns:** `{ "success": true, "data": { "results": [ ... ] } }`; each result has `object_identifier`, `property_identifier`, `property_array_index`, and `value` (JSON-encodable, including priority-array as list of `{"null": []}` / `{"real": 55}` etc.). **Under the hood:** one or more Read-Property-Multiple (RPM) requests, chunked to stay under APDU size; objects that don’t support a requested property get an error in that result only (rest still returned).
+
+* **`client_point_discovery`** — Discover all points on a device (objects, names, which are commandable). **Returns:** `device_address`, `device_instance`, and `objects`: list of `{ "object_identifier", "name", "commandable" }`. **Under the hood:** Who-Is (device); Read Property `object-list`; then one Read Property `object-name` per object and one Read Property `priority-array` per object (success ⇒ commandable, error ⇒ not). Device object is excluded from the list.
+
+* **`client_supervisory_logic_checks`** — Summary of a device’s commandable points and any active overrides. **Returns:** `device_id`, `address`, `points` (flat list of every override slot: priority level, object, name, type, value), `points_with_overrides` (per-point list with `override_priority_levels`, `has_multiple_overrides`, and `overrides`), and `summary` (`total_points`, `with_priority_array`, `without_priority_array`, `points_with_override_count`). **Under the hood:** runs point discovery (Who-Is, object-list, then one read per point for name and one for priority-array to determine commandable); then one RPM for priority-array on all commandable points; override slots are parsed from the encoded array (e.g. `{"real": 55}` at index 13 ⇒ priority 14).
+
+* **`client_read_point_priority_array`** — Read the full priority array for a single commandable point. **Returns:** list of `{ "priority_level", "type", "value" }` for all 16 slots (null or a value). **Under the hood:** one Read Property `priority-array` on that object.
+
+* **`client_discovery_to_rdf`** — Who-Is over a range, then for each device read object-list and key properties; build an RDF graph and return TTL + summary. **Returns:** `{ "ttl": "...", "summary": { "devices", "objects" } }`. **Under the hood:** one Who-Is; then per device: object-list, then multiple reads for names/properties (can be slow for large ranges).
+
+* **`client_discovery_to_rdf_device`** — Same as above for a single device instance. **Returns:** same shape. **Under the hood:** Who-Is for that instance; then object-list and property reads for that device only.
+
+---
 
 ## 🔄 Running Updates and Unit Tests Workflow
 

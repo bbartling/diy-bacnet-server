@@ -1,8 +1,9 @@
+import asyncio
 from typing import List, Union, Tuple, Optional
 from bacpypes_server.errors import PointDiscoveryError
 
 from bacpypes3.pdu import Address
-from bacpypes3.primitivedata import ObjectIdentifier, Null
+from bacpypes3.primitivedata import ObjectIdentifier, ObjectType, Null
 from bacpypes3.apdu import (
     ErrorRejectAbortNack,
     PropertyReference,
@@ -48,6 +49,57 @@ def _require_app():
             "BACnet stack not initialized (app is None). "
             "Start the server with BACnet stack enabled (e.g. run main.py with adapter config)."
         )
+
+
+def _normalize_oid(oid) -> str:
+    """
+    Normalize an object identifier to a canonical string "type,instance" (no spaces)
+    so that comparisons and dict lookups work regardless of source (tuple, ObjectIdentifier, str).
+    """
+    if oid is None:
+        return ""
+    s = str(oid).strip()
+    # e.g. "(13, 1)" from tuple
+    if s.startswith("(") and ")" in s:
+        s = s[1 : s.index(")")].replace(" ", "")
+        return s
+    # "analog-value, 1" or "13,1"
+    parts = s.split(",", 1)
+    return ",".join(p.strip() for p in parts) if len(parts) == 2 else s
+
+
+def _encode_rpm_value(property_value):  # noqa: C901
+    """
+    Encode a value from read_property_multiple to JSON-serializable form.
+    Handles ErrorType, Atomic, Sequence, Array/List, and list of PriorityValue (priority-array).
+    """
+    if isinstance(property_value, ErrorType):
+        return f"Error: {property_value.errorClass}, {property_value.errorCode}"
+    if isinstance(property_value, AnyAtomic):
+        property_value = property_value.get_value()
+    if isinstance(property_value, Atomic):
+        return atomic_encode(property_value)
+    if isinstance(property_value, Sequence):
+        return sequence_to_json(property_value)
+    if isinstance(property_value, (Array, List)):
+        return extendedlist_to_json_list(property_value)
+    # List of PriorityValue (e.g. priority-array from RPM) — match client_read_property format
+    if isinstance(property_value, (list, tuple)) and property_value:
+        first = property_value[0]
+        if hasattr(first, "_choice"):
+            out = []
+            for pv in property_value:
+                choice = pv._choice
+                val = getattr(pv, choice, None)
+                out.append({choice: [] if val is None and choice == "null" else (val if val is not None else [])})
+            return out
+        try:
+            return extendedlist_to_json_list(property_value)
+        except Exception:
+            pass
+    if isinstance(property_value, (int, float, str, bool, type(None))):
+        return property_value
+    return str(property_value)
 
 
 def _convert_to_address(address: str) -> Address:
@@ -115,8 +167,12 @@ async def bacnet_read(
             )
 
         return {property_identifier: encoded}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Read failed: {e}")
+    except HTTPException:
+        raise
+    except BaseException as e:
+        # unknown-property, reject, abort, etc. — return 400 so client gets a clear error
+        err_msg = str(e).strip() or "Read failed"
+        raise HTTPException(status_code=400, detail=err_msg)
 
 
 async def bacnet_write(
@@ -197,16 +253,12 @@ async def bacnet_rpm(
                     property_reference.propertyIdentifier
                 )
                 logger.info(f"Property type: {property_type}")
-
                 if not property_type:
-                    logger.error(
-                        f"Unrecognized property: {property_reference.propertyIdentifier}"
+                    logger.warning(
+                        "Property %s not on object class %s; sending to device (device may return error)",
+                        property_reference.propertyIdentifier,
+                        object_class,
                     )
-                    return [
-                        {
-                            "error": f"Unrecognized property: {property_reference.propertyIdentifier}"
-                        }
-                    ]
 
             # Save this property reference as a parameter
             property_reference_list.append(property_reference)
@@ -242,13 +294,7 @@ async def bacnet_rpm(
             "property_identifier": property_identifier,
             "property_array_index": property_array_index,
         }
-        if isinstance(property_value, ErrorType):
-            result["value"] = (
-                f"Error: {property_value.errorClass}, {property_value.errorCode}"
-            )
-        else:
-            result["value"] = property_value
-
+        result["value"] = _encode_rpm_value(property_value)
         result_list.append(result)
 
     logger.info(f"result_list: {result_list}")
@@ -371,6 +417,9 @@ async def point_discovery(
                 "objects": [],
             }
 
+        # Exclude device object (no priority-array); device object-list includes itself
+        object_list = [o for o in object_list if o[0] != ObjectType.device]
+
         # fallback if object-list is empty
         if not object_list:
             try:
@@ -405,25 +454,27 @@ async def point_discovery(
                 logger.warning(f"Error reading name for {obj_id}: {err}")
                 names_list.append("ERROR - Delete this row")
 
-        # Commandable (writable) = read 'priority-array'; if it exists then writeable, else read-only
-        commandable_oids: set = set()
-        try:
-            rpm_requests = [(str(oid), "priority-array") for oid, _ in zip(object_list, names_list)]
-            rpm_results = await bacnet_rpm_chunked(device_address, rpm_requests)
-            for r in rpm_results:
-                if "error" not in r:
-                    commandable_oids.add(str(r.get("object_identifier", "")).strip())
-        except Exception as err:
-            logger.debug(f"Priority-array batch read failed (commandable all False): {err}")
+        # Commandable (writable) = read "priority-array" on each point; success => commandable, any error (e.g. unknown-property) => not commandable, move on
+        async def _try_priority_array(oid):
+            try:
+                await app.read_property(device_address, oid, "priority-array")
+                return _normalize_oid(oid)
+            except BaseException:
+                # unknown-property, reject, abort, etc. => point is not commandable
+                return None
+
+        tasks = [_try_priority_array(oid) for oid in object_list]
+        results = await asyncio.gather(*tasks)
+        commandable_oids = {r for r in results if r is not None}
 
         return {
             "device_address": str(device_address),
             "device_instance": instance_id,
             "objects": [
                 {
-                    "object_identifier": str(oid),
+                    "object_identifier": _normalize_oid(oid),
                     "name": name,
-                    "commandable": str(oid).strip() in commandable_oids,
+                    "commandable": _normalize_oid(oid) in commandable_oids,
                 }
                 for oid, name in zip(object_list, names_list)
             ],
@@ -496,19 +547,23 @@ async def supervisory_logic_check(instance_id: int) -> dict:
                 "device_id": instance_id,
                 "address": None,
                 "points": [],
+                "points_with_overrides": [],
                 "summary": {
                     "total_points": 0,
                     "with_priority_array": 0,
                     "without_priority_array": 0,
+                    "points_with_override_count": 0,
                 },
             }
 
         logger.info(f"Found {len(objects)} points for device {instance_id}")
 
         points = []
+        points_with_overrides_detail: dict = {}  # oid -> list of {priority_level, value, ...}
         name_by_oid = {obj["object_identifier"]: obj["name"] for obj in objects}
 
-        # Chunked priority-array read for all commandable points (writeable = priority-array existed in discovery)
+        # Commandable was set in point_discovery by reading "priority-array" on each point (success => commandable, error => not).
+        # Here we only re-read priority-array for those commandable points to get override slots.
         commandable_list = [
             (obj["object_identifier"], obj["name"])
             for obj in objects
@@ -524,12 +579,17 @@ async def supervisory_logic_check(instance_id: int) -> dict:
                 for r in rpm_results:
                     if "error" in r:
                         continue
-                    oid = str(r.get("object_identifier", "")).strip()
-                    idx = r.get("property_array_index", 0)
+                    oid = _normalize_oid(r.get("object_identifier", ""))
+                    idx = r.get("property_array_index")
                     val = r.get("value")
-                    by_oid.setdefault(oid, []).append((idx, val))
+                    # RPM can return one result per object with property_array_index=None and value=list of slots
+                    if idx is None and isinstance(val, list):
+                        for i, slot in enumerate(val):
+                            by_oid.setdefault(oid, []).append((i, slot))
+                    else:
+                        by_oid.setdefault(oid, []).append((idx if idx is not None else 0, val))
                 for oid in by_oid:
-                    by_oid[oid].sort(key=lambda x: x[0])
+                    by_oid[oid].sort(key=lambda x: (x[0] if x[0] is not None else -1))
             except Exception as e:
                 logger.warning(f"Chunked priority-array read failed: {e}")
 
@@ -550,43 +610,83 @@ async def supervisory_logic_check(instance_id: int) -> dict:
                 continue
 
             points_with_priority_array += 1
+            priority_level_base = 1  # BACnet priority 1-based
             for idx, value in priority_slots:
-                if value is None or (isinstance(value, str) and (value == "null" or value.startswith("Error:"))):
-                    continue
-                try:
-                    data_as_float = float(value)
-                except (TypeError, ValueError):
-                    data_as_float = value
+                slot_idx = idx if idx is not None else 0
+                priority_level = slot_idx + priority_level_base
+                # Value can be raw (from device) or encoded dict {"null": []} / {"real": 55} (from RPM)
+                if isinstance(value, dict):
+                    if "null" in value:
+                        continue
+                    # One non-null key (real, binary, etc.)
+                    keys = [k for k in value if k != "null"]
+                    if not keys:
+                        continue
+                    type_name = keys[0]
+                    raw_val = value[type_name]
+                    try:
+                        data_as_float = float(raw_val)
+                    except (TypeError, ValueError):
+                        data_as_float = raw_val
+                else:
+                    if value is None or (isinstance(value, str) and (value == "null" or value.startswith("Error:"))):
+                        continue
+                    try:
+                        data_as_float = float(value)
+                    except (TypeError, ValueError):
+                        data_as_float = value
+                    type_name = "real" if isinstance(value, (int, float)) else type(value).__name__
+
                 value_str = {
                     "data_as_float": data_as_float,
-                    "raw_data_type": value,
+                    "raw_data_type": raw_val if isinstance(value, dict) else value,
                 }
-                type_name = "real" if isinstance(value, (int, float)) else type(value).__name__
+                slot_info = {
+                    "priority_level": priority_level,
+                    "type": type_name,
+                    "value": value_str,
+                }
                 points.append(
                     {
-                        "priority_level": idx + 1,
+                        "priority_level": priority_level,
                         "object_identifier": str(object_id),
                         "object_name": point_name,
                         "type": type_name,
                         "value": value_str,
                     }
                 )
+                oid_key = obj["object_identifier"]
+                points_with_overrides_detail.setdefault(oid_key, []).append(slot_info)
+
+        points_with_overrides = []
+        for oid, slots in points_with_overrides_detail.items():
+            priority_levels = [s["priority_level"] for s in slots]
+            points_with_overrides.append({
+                "object_identifier": oid,
+                "object_name": name_by_oid.get(oid, ""),
+                "override_priority_levels": priority_levels,
+                "has_multiple_overrides": len(priority_levels) > 1,
+                "overrides": slots,
+            })
 
         logger.info("=" * 40)
         logger.info(f"Summary for device {instance_id}:")
         logger.info(f"Total Points: {total_points}")
         logger.info(f"With Priority Array: {points_with_priority_array}")
         logger.info(f"Without Priority Array: {points_without_priority_array}")
+        logger.info(f"Points with overrides: {len(points_with_overrides)}")
         logger.info("=" * 40)
 
         return {
             "device_id": instance_id,
             "address": device_address,
             "points": points,
+            "points_with_overrides": points_with_overrides,
             "summary": {
                 "total_points": total_points,
                 "with_priority_array": points_with_priority_array,
                 "without_priority_array": points_without_priority_array,
+                "points_with_override_count": len(points_with_overrides),
             },
         }
 
@@ -599,10 +699,12 @@ async def supervisory_logic_check(instance_id: int) -> dict:
         "device_id": instance_id,
         "address": None,
         "points": [],
+        "points_with_overrides": [],
         "summary": {
             "total_points": 0,
             "with_priority_array": 0,
             "without_priority_array": 0,
+            "points_with_override_count": 0,
         },
     }
 
