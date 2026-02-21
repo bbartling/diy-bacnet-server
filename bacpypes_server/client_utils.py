@@ -394,7 +394,6 @@ async def point_discovery(
         vendor_info = get_vendor_info(i_am.vendorID)
 
         object_list = []
-        names_list = []
 
         try:
             object_list = await app.read_property(
@@ -417,7 +416,7 @@ async def point_discovery(
                 "objects": [],
             }
 
-        # Exclude device object (no priority-array); device object-list includes itself
+        # Exclude device object
         object_list = [o for o in object_list if o[0] != ObjectType.device]
 
         # fallback if object-list is empty
@@ -442,31 +441,63 @@ async def point_discovery(
                     "objects": [],
                 }
 
+        # -------------------------------------------------------------
+        # 1. Chunked RPM for Object Names (Using your native wrapper!)
+        # -------------------------------------------------------------
+        rpm_requests_names = []
         for obj_id in object_list:
-            object_class = vendor_info.get_object_class(obj_id[0])
-            if not object_class:
+            if vendor_info.get_object_class(obj_id[0]):
+                rpm_requests_names.append((f"{obj_id[0]},{obj_id[1]}", "object-name"))
+            else:
                 logger.warning(f"Unknown object type: {obj_id}")
-                continue
-            try:
-                name = await app.read_property(device_address, obj_id, "object-name")
-                names_list.append(str(name))
-            except Exception as err:
-                logger.warning(f"Error reading name for {obj_id}: {err}")
-                names_list.append("ERROR - Delete this row")
 
-        # Commandable (writable) = read "priority-array" on each point; success => commandable, any error (e.g. unknown-property) => not commandable, move on
-        async def _try_priority_array(oid):
-            try:
-                await app.read_property(device_address, oid, "priority-array")
-                return _normalize_oid(oid)
-            except BaseException:
-                # unknown-property, reject, abort, etc. => point is not commandable
-                return None
+        # Let bacnet_rpm_chunked do the heavy lifting
+        name_results = await bacnet_rpm_chunked(device_address, rpm_requests_names, chunk_size=15)
+        
+        name_map = {}
+        for res in name_results:
+            if "error" not in res:
+                oid_str = _normalize_oid(res.get("object_identifier"))
+                name_map[oid_str] = res.get("value")
 
-        tasks = [_try_priority_array(oid) for oid in object_list]
-        results = await asyncio.gather(*tasks)
-        commandable_oids = {r for r in results if r is not None}
+        names_list = []
+        for obj_id in object_list:
+            oid_str = _normalize_oid(obj_id)
+            if oid_str in name_map:
+                names_list.append(str(name_map[oid_str]))
+            else:
+                names_list.append("ERROR - Missing Data")
 
+        # -------------------------------------------------------------
+        # 2. Chunked RPM for Priority Arrays (Commandable Check)
+        # -------------------------------------------------------------
+        commandable_oids = set()
+        
+        valid_commandable_types = {
+            "analog-output", "analog-value", 
+            "binary-output", "binary-value", 
+            "multi-state-output", "multi-state-value",
+            "integer-value", "large-analog-value", "positive-integer-value"
+        }
+        
+        rpm_requests_pa = []
+        for obj_id in object_list:
+            if str(obj_id[0]).lower() in valid_commandable_types:
+                rpm_requests_pa.append((f"{obj_id[0]},{obj_id[1]}", "priority-array"))
+                
+        pa_results = await bacnet_rpm_chunked(device_address, rpm_requests_pa, chunk_size=15)
+        
+        for res in pa_results:
+            if "error" not in res:
+                oid = res.get("object_identifier")
+                val = res.get("value")
+                # If we got a value back, it has a priority array!
+                if oid and val is not None:
+                    commandable_oids.add(_normalize_oid(oid))
+
+        # -------------------------------------------------------------
+        # 3. Final Output Generation
+        # -------------------------------------------------------------
         return {
             "device_address": str(device_address),
             "device_instance": instance_id,
@@ -481,7 +512,7 @@ async def point_discovery(
         }
 
     except PointDiscoveryError:
-        raise  # let it propagate cleanly
+        raise
     except Exception as e:
         raise PointDiscoveryError(
             data={
@@ -489,6 +520,7 @@ async def point_discovery(
                 "detail": f"Unexpected error during discovery: {e}",
             }
         )
+
 
 
 async def read_point_priority_arr(
@@ -614,37 +646,27 @@ async def supervisory_logic_check(instance_id: int) -> dict:
             for idx, value in priority_slots:
                 slot_idx = idx if idx is not None else 0
                 priority_level = slot_idx + priority_level_base
-                # Value can be raw (from device) or encoded dict {"null": []} / {"real": 55} (from RPM)
+                
+                # --- START FLATTENED EXTRACTION ---
                 if isinstance(value, dict):
                     if "null" in value:
                         continue
-                    # One non-null key (real, binary, etc.)
                     keys = [k for k in value if k != "null"]
                     if not keys:
                         continue
                     type_name = keys[0]
                     raw_val = value[type_name]
-                    try:
-                        data_as_float = float(raw_val)
-                    except (TypeError, ValueError):
-                        data_as_float = raw_val
                 else:
                     if value is None or (isinstance(value, str) and (value == "null" or value.startswith("Error:"))):
                         continue
-                    try:
-                        data_as_float = float(value)
-                    except (TypeError, ValueError):
-                        data_as_float = value
                     type_name = "real" if isinstance(value, (int, float)) else type(value).__name__
+                    raw_val = value
+                # --- END FLATTENED EXTRACTION ---
 
-                value_str = {
-                    "data_as_float": data_as_float,
-                    "raw_data_type": raw_val if isinstance(value, dict) else value,
-                }
                 slot_info = {
                     "priority_level": priority_level,
                     "type": type_name,
-                    "value": value_str,
+                    "value": raw_val,
                 }
                 points.append(
                     {
@@ -652,7 +674,7 @@ async def supervisory_logic_check(instance_id: int) -> dict:
                         "object_identifier": str(object_id),
                         "object_name": point_name,
                         "type": type_name,
-                        "value": value_str,
+                        "value": raw_val,
                     }
                 )
                 oid_key = obj["object_identifier"]
