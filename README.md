@@ -1,5 +1,8 @@
 ## 🚀 diy-bacnet-server
 
+[![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/Ta48yQF8fC)
+
+
 ![Swagger UI](https://github.com/bbartling/diy-bacnet-server/blob/develop/snip.png)
 
 
@@ -92,11 +95,22 @@ outdoor-temp,AV,degreesFahrenheit,N,22.0
 Human-friendly / API name for the BACnet point.
 
 **`PointType`**
-BACnet object type:
+BACnet object type. **Supported by the server and BACnet2MQTT bridge:**
 
-* `AV` = Analog Value
-* `BV` = Binary Value
-  (You could extend this later with AI/AO/BI/BO/etc.)
+| Code | Object type | Read/write behavior |
+|------|-------------|----------------------|
+| **AI** | Analog Input | Read-only |
+| **AO** | Analog Output | Commandable |
+| **AV** | Analog Value | Commandable only if `Commandable=Y` |
+| **BI** | Binary Input | Read-only |
+| **BO** | Binary Output | Commandable |
+| **BV** | Binary Value | Commandable only if `Commandable=Y` |
+| **MSI** | Multistate Input | Read-only |
+| **MSO** | Multistate Output (MVO) | Commandable |
+| **MSV** | Multistate Value | Commandable only if `Commandable=Y` |
+| **Schedule** | Schedule | Read-only (presentValue reflects weekly schedule) |
+
+For **MSI**, **MSO**, and **MSV** you can set an optional **States** column (integer) for the number of states (default 2). **Schedule** creates one BACnet Schedule object with a fixed weekly pattern (Mon–Fri 08:00–17:00 = 1, else 0); no Calendar or exception schedule. *Note:* In `bacpypes3/local/schedule.py`, if `interpret_schedule()` uses `call_at(absolute_timestamp, ...)`, that is a known bug—`call_at()` expects the event loop’s monotonic time. The fix is to use `call_later(delay_seconds, ...)` where `delay_seconds` is the difference between the next transition time and now.
 
 **`Units`**
 Engineering units for analog points (e.g., `degreesFahrenheit`, `Status`, `percent`, etc.).
@@ -122,6 +136,36 @@ Initial value the point is initialized with when the server starts.
 
 
 > Refer to the Swagger UI for details on how data is read from and written to the BACnet server. Points are updated and retrieved using JSON-RPC POST requests.
+
+---
+
+## BACnet2MQTT bridge (optional)
+
+The server can run an **MQTT bridge** that mirrors your CSV-defined points (AI, AO, AV, BI, BO, BV, MSI, MSO, MSV) to MQTT topics, so tools like **Home Assistant** can discover and control them via MQTT. The bridge runs inside the same process when enabled via environment variables; no extra container is required.
+
+**Enable the bridge:** set `BACNET2MQTT_ENABLED=true` and `MQTT_BROKER_URL` (e.g. `mqtt://localhost:1883`). Optional env:
+
+| Variable | Default | Description |
+| -------- | ------- | ------------ |
+| `MQTT_BASE_TOPIC` | `bacnet2mqtt` | Base topic for state and commands |
+| `MQTT_POLL_INTERVAL_SEC` | `30` | How often to publish point state |
+| `HA_DISCOVERY_ENABLED` | `false` | Publish Home Assistant MQTT discovery configs |
+| `HA_DISCOVERY_TOPIC` | `homeassistant` | Discovery topic prefix |
+| `MQTT_USER` / `MQTT_PASSWORD` | — | Broker auth (optional) |
+
+**Topic layout:**
+
+* `{base_topic}/bridge/state` — online/offline (retained)
+* `{base_topic}/bridge/info` — version, BACnet instance (retained)
+* `{base_topic}/bridge/devices` — JSON list of points (friendly_name, type AI/AO/AV/BI/BO/BV/MSI/MSO/MSV, commandable, units) (retained)
+* `{base_topic}/{point_name}` — state JSON, e.g. `{"present_value": 72.5, "units": "degreesFahrenheit"}`
+* `{base_topic}/{point_name}/set` — command payload (number for analog types; `active`/`inactive` or 1/0 for binary; integer for multistate)
+
+Only **non-commandable** points can be written via MQTT `.../set`; commandable points must be written via BACnet (e.g. priority array) or a future bridge extension. With `HA_DISCOVERY_ENABLED=true`, the bridge publishes MQTT discovery messages so Home Assistant creates sensor/number/binary_sensor/switch entities with availability tied to `{base_topic}/bridge/state`.
+
+**Supported point types for the bridge:** same as the CSV — **AI, AO, AV, BI, BO, BV, MSI, MSO, MSV**. Inputs (AI, BI, MSI) are read-only; outputs (AO, BO, MSO) and value objects with `Commandable=Y` (AV, BV, MSV) are commandable.
+
+**→ Beginner setup:** See **[HOME_ASSISTANT_MQTT_CHEATSHEET.md](HOME_ASSISTANT_MQTT_CHEATSHEET.md)** for a step-by-step, browser-only guide to adding the MQTT broker in Home Assistant and trying the integration.
 
 ---
 
@@ -203,10 +247,6 @@ The server can act as a **BACnet client** to other devices on the network. These
 * **`client_supervisory_logic_checks`** — Summary of a device’s commandable points and any active overrides. **Returns:** `device_id`, `address`, `points` (flat list of every override slot: priority level, object, name, type, value), `points_with_overrides` (per-point list with `override_priority_levels`, `has_multiple_overrides`, and `overrides`), and `summary` (`total_points`, `with_priority_array`, `without_priority_array`, `points_with_override_count`). **Under the hood:** runs point discovery (Who-Is, object-list, then one read per point for name and one for priority-array to determine commandable); then one RPM for priority-array on all commandable points; override slots are parsed from the encoded array (e.g. `{"real": 55}` at index 13 ⇒ priority 14).
 
 * **`client_read_point_priority_array`** — Read the full priority array for a single commandable point. **Returns:** list of `{ "priority_level", "type", "value" }` for all 16 slots (null or a value). **Under the hood:** one Read Property `priority-array` on that object.
-
-* **`client_discovery_to_rdf`** — Who-Is over a range, then for each device read object-list and key properties; build an RDF graph and return TTL + summary. **Returns:** `{ "ttl": "...", "summary": { "devices", "objects" } }`. **Under the hood:** one Who-Is; then per device: object-list, then multiple reads for names/properties (can be slow for large ranges).
-
-* **`client_discovery_to_rdf_device`** — Same as above for a single device instance. **Returns:** same shape. **Under the hood:** Who-Is for that instance; then object-list and property reads for that device only.
 
 ---
 
@@ -320,11 +360,7 @@ http://localhost:8080/docs
 curl http://localhost:8080/openapi.json
 ```
 
-### RDF discovery (BRICK / Open-FDD)
-
-The method **`client_discovery_to_rdf`** runs a deep scan (Who-Is + object-list + key properties), builds an RDF graph with bacpypes3’s `BACnetGraph`, and returns a **TTL** string plus summary. For integration with Open-FDD and BRICK, so BACnet topology can be merged into a single semantic model. Requires `rdflib` (`pip install rdflib`). See Open-FDD’s `docs/bacnet-rdf-and-brick.md` for architecture and merge strategy.
-
----
+RDF/BRICK discovery was removed from this server; do that integration in a separate app if needed.
 
 ## 🔄 Workflow: Updating Sensor Data On BACnet Server
 
@@ -424,7 +460,7 @@ By default, the API binds to `127.0.0.1` for safety.
 
 ## Unit Tests Notes
 
-This test suite ensures that the DIY BACnet Server works reliably as a real, usable application rather than just code that runs. It verifies that the Docker-based BACnet server container starts correctly, initializes its services, and responds as expected. It also confirms that the JSON-RPC interface is correctly wired, exposing the appropriate RPC entrypoint and methods, and that important RPC helpers—such as the server readiness check and BACnet Who-Is discovery wrapper—can execute safely without crashing. Together, these tests validate the integration between FastAPI, fastapi-jsonrpc, Pydantic models, and BACpypes3 to ensure the system behaves as a functional BACnet utility service.
+This test suite ensures that the DIY BACnet Server works reliably as a real, usable application rather than just code that runs. It verifies that the Docker-based BACnet server container starts correctly, initializes its services, and responds as expected. It also confirms that the JSON-RPC interface is correctly wired, exposing the appropriate RPC entrypoint and methods, and that important RPC helpers—such as the server readiness check and BACnet Who-Is discovery wrapper—can execute safely without crashing. The **BACnet2MQTT bridge** is covered by `tests/test_mqtt_bridge.py` (config from env, topic parsing, set payload mapping, bridge/devices and HA discovery payloads). Together, these tests validate the integration between FastAPI, fastapi-jsonrpc, Pydantic models, BACpypes3, and the optional MQTT bridge.
 
 
 ```bash

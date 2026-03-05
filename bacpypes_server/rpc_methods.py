@@ -22,12 +22,27 @@ from bacpypes_server.client_utils import (
     read_point_priority_arr,
     perform_who_is_router_to_network,
 )
-from bacpypes_server.rdf_scan import discovery_to_rdf, discovery_to_rdf_one_device
 from bacpypes_server.server_utils import (
     point_map,
     commandable_point_names,
     CommandableAnalogValueObject,
     CommandableBinaryValueObject,
+)
+
+from bacpypes3.local.analog import (
+    AnalogInputObject,
+    AnalogOutputObject,
+    AnalogValueObject,
+)
+from bacpypes3.local.binary import (
+    BinaryInputObject,
+    BinaryOutputObject,
+    BinaryValueObject,
+)
+from bacpypes3.local.multistate import (
+    MultiStateInputObject,
+    MultiStateOutputObject,
+    MultiStateValueObject,
 )
 
 from bacpypes_server.errors import (
@@ -41,8 +56,6 @@ from bacpypes_server.errors import (
     SupervisoryCheckError,
 )
 
-from bacpypes3.local.analog import AnalogValueObject
-from bacpypes3.local.binary import BinaryValueObject
 from bacpypes3.json.util import atomic_encode
 from bacpypes3.primitivedata import ObjectIdentifier
 
@@ -89,7 +102,18 @@ def server_update_points(update: PointUpdate) -> dict:
             result[name] = "not found"
             continue
         try:
-            if isinstance(obj, BinaryValueObject):
+            if isinstance(obj, (AnalogInputObject, AnalogValueObject, AnalogOutputObject)):
+                new_value = float(value)
+                current_value = float(obj.presentValue)
+                if current_value != new_value:
+                    logger.info(
+                        f"Analog update: {name} changed from {current_value} → {new_value}"
+                    )
+                    obj.presentValue = new_value
+                    result[name] = f"changed from {current_value} → {new_value}"
+                else:
+                    logger.debug(f"Analog unchanged: {name} = {current_value}")
+            elif isinstance(obj, (BinaryInputObject, BinaryValueObject, BinaryOutputObject)):
                 desired_value = (
                     "active"
                     if value in [1, True, "true", "True", "active"]
@@ -98,23 +122,25 @@ def server_update_points(update: PointUpdate) -> dict:
                 current_value = str(obj.presentValue).lower()
                 if current_value != desired_value:
                     logger.info(
-                        f"BV update: {name} changed from {current_value} → {desired_value}"
+                        f"Binary update: {name} changed from {current_value} → {desired_value}"
                     )
                     obj.presentValue = desired_value
                     result[name] = f"changed from {current_value} → {desired_value}"
                 else:
-                    logger.debug(f"BV unchanged: {name} = {current_value}")
-            elif isinstance(obj, AnalogValueObject):
-                new_value = float(value)
-                current_value = float(obj.presentValue)
+                    logger.debug(f"Binary unchanged: {name} = {current_value}")
+            elif isinstance(obj, (MultiStateInputObject, MultiStateValueObject, MultiStateOutputObject)):
+                new_value = int(value)
+                current_value = int(obj.presentValue)
                 if current_value != new_value:
                     logger.info(
-                        f"AV update: {name} changed from {current_value} → {new_value}"
+                        f"Multistate update: {name} changed from {current_value} → {new_value}"
                     )
                     obj.presentValue = new_value
                     result[name] = f"changed from {current_value} → {new_value}"
                 else:
-                    logger.debug(f"AV unchanged: {name} = {current_value}")
+                    logger.debug(f"Multistate unchanged: {name} = {current_value}")
+            else:
+                result[name] = "unsupported object type for update"
         except Exception as e:
             logger.error(f"Error updating {name}: {e}")
             result[name] = f"error: {e}"
@@ -124,17 +150,25 @@ def server_update_points(update: PointUpdate) -> dict:
 @rpc.method()
 def server_read_commandable() -> dict:
     result = {}
+    commandable_types = (
+        CommandableAnalogValueObject,
+        CommandableBinaryValueObject,
+        AnalogOutputObject,
+        BinaryOutputObject,
+        MultiStateOutputObject,
+    )
     for name, obj in point_map.items():
-        if isinstance(
-            obj, (CommandableAnalogValueObject, CommandableBinaryValueObject)
+        if isinstance(obj, commandable_types) or (
+            isinstance(obj, MultiStateValueObject) and name in commandable_point_names
         ):
             try:
                 value = obj.presentValue
-                result[name] = (
-                    float(value)
-                    if isinstance(obj, CommandableAnalogValueObject)
-                    else str(value)
-                )
+                if isinstance(obj, (CommandableAnalogValueObject, AnalogOutputObject)):
+                    result[name] = float(value)
+                elif isinstance(obj, (CommandableBinaryValueObject, BinaryOutputObject)):
+                    result[name] = str(value)
+                else:
+                    result[name] = int(value)
             except Exception as e:
                 logger.error(f"Error reading {name}: {e}")
                 result[name] = f"error: {e}"
@@ -314,54 +348,3 @@ async def client_whois_router_to_network() -> BaseResponse:
     except Exception as e:
         logger.error(f"Who-Is-Router-To-Network failed: {e}")
         raise WhoIsFailureError(data={"detail": str(e)})
-
-
-@rpc.method()
-async def client_discovery_to_rdf(request: DeviceInstanceRange) -> dict:
-    """
-    Deep scan: Who-Is in range, then for each device read object-list and key
-    properties. Build RDF, return TTL + summary. Can be slow for large ranges;
-    prefer client_discovery_to_rdf_device for one device at a time.
-    """
-    try:
-        result = await discovery_to_rdf(
-            start_instance=request.start_instance,
-            end_instance=request.end_instance,
-        )
-        return result
-    except RuntimeError as e:
-        if "rdflib" in str(e):
-            raise WhoIsFailureError(
-                data={"detail": str(e) + ". Install: pip install rdflib"}
-            )
-        raise WhoIsFailureError(data={"detail": str(e)})
-    except Exception as e:
-        logger.exception("Discovery-to-RDF failed")
-        raise WhoIsFailureError(
-            data={"detail": f"{e!s}\n{traceback.format_exc()}"}
-        )
-
-
-@rpc.method()
-async def client_discovery_to_rdf_device(instance: DeviceInstanceOnly) -> dict:
-    """
-    Deep scan a single device (same param shape as client_point_discovery).
-    Who-Is for that device_instance only, then object-list + key properties,
-    build RDF, return TTL + summary. Fast for one device; use this instead of
-    client_discovery_to_rdf when scanning per device.
-    Params: {"instance": {"device_instance": 3456789}}
-    """
-    try:
-        result = await discovery_to_rdf_one_device(instance.device_instance)
-        return result
-    except RuntimeError as e:
-        if "rdflib" in str(e):
-            raise WhoIsFailureError(
-                data={"detail": str(e) + ". Install: pip install rdflib"}
-            )
-        raise WhoIsFailureError(data={"detail": str(e)})
-    except Exception as e:
-        logger.exception("Discovery-to-RDF (one device) failed")
-        raise WhoIsFailureError(
-            data={"detail": f"{e!s}\n{traceback.format_exc()}"}
-        )

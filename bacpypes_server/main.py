@@ -4,8 +4,9 @@ import logging
 import argparse
 
 from bacpypes_server.rpc_app import rpc_api
-from bacpypes_server.server_utils import load_csv_and_create_objects
+from bacpypes_server.server_utils import load_csv_and_create_objects, point_map, commandable_point_names
 from bacpypes_server.client_utils import set_app
+from bacpypes_server.mqtt_bridge import get_bridge_config, run_mqtt_bridge
 
 from bacpypes3.argparse import SimpleArgumentParser
 from bacpypes3.ipv4.app import Application
@@ -55,12 +56,33 @@ async def main():
     # Choose host based on --public
     host = "0.0.0.0" if args.public else "127.0.0.1"
 
+    # Start BACnet2MQTT bridge in background if enabled
+    bridge_task = None
+    if get_bridge_config() is not None:
+        bridge_task = asyncio.create_task(
+            run_mqtt_bridge(
+                point_map,
+                commandable_point_names,
+                bacnet_instance_name=getattr(args, "name", "BACnet"),
+                bacnet_instance_number=getattr(args, "instance", 0),
+            )
+        )
+        logger.info("BACnet2MQTT bridge task started.")
+
     # Start JSON-RPC server via uvicorn
     config = uvicorn.Config(app=rpc_api, host=host, port=8080, log_level="debug")
     server = uvicorn.Server(config)
 
     logger.info(f"JSON-RPC API ready at http://{host}:8080/docs")
-    await server.serve()
+    try:
+        await server.serve()
+    finally:
+        if bridge_task is not None:
+            bridge_task.cancel()
+            try:
+                await bridge_task
+            except asyncio.CancelledError:
+                pass
 
 
 if __name__ == "__main__":
