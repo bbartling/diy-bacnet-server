@@ -1,9 +1,17 @@
 """Parse helpers and JSON-RPC API contract (TestClient) — no live BACnet."""
 
+import os
+
 import pytest
+from bacpypes3.primitivedata import ObjectIdentifier
 
 from bacpypes_server.rpc_methods import parse_object_identifier
-from bacpypes3.primitivedata import ObjectIdentifier
+
+
+def _rpc_auth_headers() -> dict:
+    """Match production: when BACNET_RPC_API_KEY is set (e.g. Open-FDD stack), RPC needs Bearer."""
+    k = (os.environ.get("BACNET_RPC_API_KEY") or "").strip()
+    return {"Authorization": f"Bearer {k}"} if k else {}
 
 
 def test_parse_object_identifier_valid():
@@ -64,7 +72,7 @@ def test_client_whois_range_request_shape(rpc_app):
         "method": "client_whois_range",
         "params": {"request": {"start_instance": 1, "end_instance": 100}},
     }
-    resp = client.post("/client_whois_range", json=payload)
+    resp = client.post("/client_whois_range", json=payload, headers=_rpc_auth_headers())
     # 200 with JSON-RPC response; body may be result or error depending on whether app is set
     assert resp.status_code == 200
     data = resp.json()

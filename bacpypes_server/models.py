@@ -78,16 +78,29 @@ class DeviceInstanceOnly(BaseModel):
     )
 
 
+def _device_instance_range_json_schema(schema: dict) -> None:
+    """Keep start_instance before end_instance in OpenAPI (alphabetical order would flip them)."""
+    props = schema.get("properties")
+    if isinstance(props, dict) and "start_instance" in props and "end_instance" in props:
+        schema["properties"] = {
+            "start_instance": props["start_instance"],
+            "end_instance": props["end_instance"],
+        }
+    schema["example"] = {"start_instance": 1, "end_instance": 3456799}
+
+
 class DeviceInstanceRange(BaseModel):
-    model_config = ConfigDict(
-        json_schema_extra={"example": {"start_instance": 1000, "end_instance": 1010}}
-    )
+    """Who-Is instance range; defaults match Open-FDD POST /bacnet/whois_range (WhoIsRequestRange)."""
+
+    model_config = ConfigDict(json_schema_extra=_device_instance_range_json_schema)
 
     start_instance: conint(ge=0, le=4194303) = Field(
-        ..., description="Start of the instance scan range"
+        default=1,
+        description="Start device instance (0–4194303)",
     )
     end_instance: conint(ge=0, le=4194303) = Field(
-        ..., description="End of the instance scan range"
+        default=3456799,
+        description="End device instance (0–4194303)",
     )
 
 

@@ -215,7 +215,7 @@ These endpoints target **real BACnet devices** on the BACnet LAN.
 
 ### 5.1 `client_whois_range` (discovery sweep)
 
-Scan a device-instance range for responses.
+Scan a device-instance range for responses. Default `params.request` matches Open-FDD **POST /bacnet/whois_range** (`start_instance` 1, `end_instance` 3456799).
 
 **Request**
 
@@ -226,8 +226,8 @@ Scan a device-instance range for responses.
   "method": "client_whois_range",
   "params": {
     "request": {
-      "start_instance": 1000,
-      "end_instance": 200000
+      "start_instance": 1,
+      "end_instance": 3456799
     }
   }
 }

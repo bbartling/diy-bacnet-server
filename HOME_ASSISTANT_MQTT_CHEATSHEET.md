@@ -1,18 +1,32 @@
-# Home Assistant + BACnet2MQTT — Try-it-yourself cheat sheet
+# MQTT + diy-bacnet-server — Home Assistant, Open-FDD, and optional RPC gateway
+
+This guide covers three related ideas:
+
+1. **Home Assistant + BACnet2MQTT** — point state and HA discovery (browser-friendly steps below).
+2. **Open-FDD–hosted Mosquitto** — when you run **[Open-FDD](https://github.com/bbartling/open-fdd)** with `./scripts/bootstrap.sh --with-mqtt-bridge`, the stack can start a **local broker** (`localhost:1883`) so **diy-bacnet-server** (and other services) use a **generic** MQTT broker—no cloud vendor required.
+3. **MQTT RPC gateway (experimental)** — a separate feature in **diy-bacnet-server**: subscribe on `{prefix}/cmd`, publish acks on `{prefix}/ack`, optional telemetry topics. Same JSON-RPC **method** names as HTTP; intended for future Open-FDD / automation integration. See the **[README — MQTT RPC gateway](README.md#mqtt-rpc-gateway-optional-experimental)** for env vars, topics, and `mosquitto_pub` examples.
+
+**Relationship:** BACnet2MQTT is for **per-point** topics and Home Assistant discovery. The MQTT RPC gateway is for **request/response-style** commands over pub/sub (Who-Is, read property, server point updates, etc.). You can run one, both, or neither; each is gated by its own env flags.
+
+---
+
+## Home Assistant + BACnet2MQTT — Try-it-yourself cheat sheet
 
 Get your DIY BACnet server’s points into Home Assistant over MQTT (browser-only, beginner-style). Same idea as **Zigbee2MQTT**: one broker, discovery, entities in HA.
 
----
-
-## 1. Prerequisites
+### 1. Prerequisites
 
 - **diy-bacnet-server** running (Docker or local) with a CSV that defines your points.
 - **Home Assistant** running (e.g. on the same host or another machine that can reach the broker).
-- An **MQTT broker** that both the BACnet server and Home Assistant can use (e.g. Mosquitto on the HA host, or HA’s built-in MQTT broker if you add the integration).
+- An **MQTT broker** that both the BACnet server and Home Assistant can use (e.g. Mosquitto on the HA host, **or** Mosquitto started by **Open-FDD** with `--with-mqtt-bridge` if HA and the gateway share that network).
+
+### Open-FDD broker tip
+
+If the BACnet container uses **`--network host`** (Open-FDD default for **diy-bacnet-server**), `MQTT_BROKER_URL=mqtt://127.0.0.1:1883` targets Mosquitto on the **same host** as the gateway. Point Home Assistant’s MQTT integration at that host if HA also runs there, or use the LAN IP if HA is elsewhere.
 
 ---
 
-## 2. Install / configure the MQTT broker (in Home Assistant)
+### 2. Install / configure the MQTT broker (in Home Assistant)
 
 1. In HA: **Settings → Add-ons** (or **Settings → Devices & services → Add-ons**).
 2. If you don’t have **Mosquitto broker**: install **“Mosquitto broker”** from the add-on store.
@@ -24,7 +38,7 @@ If you prefer a **manual** (non-add-on) broker on the same host as HA, install M
 
 ---
 
-## 3. Add the MQTT integration in Home Assistant
+### 3. Add the MQTT integration in Home Assistant
 
 1. **Settings → Devices & services → Add integration**.
 2. Search for **“MQTT”**.
@@ -37,7 +51,7 @@ If you prefer a **manual** (non-add-on) broker on the same host as HA, install M
 
 ---
 
-## 4. Run the BACnet server with the MQTT bridge
+### 4. Run the BACnet server with the MQTT bridge
 
 Set these **environment variables** so the BACnet server starts the bridge and points to your broker:
 
@@ -72,7 +86,7 @@ Restart the BACnet server after changing env vars so the bridge (re)connects and
 
 ---
 
-## 5. Check that the bridge is talking MQTT
+### 5. Check that the bridge is talking MQTT
 
 1. In HA: **Settings → Devices & services → MQTT → Configure** (or **MQTT** card).
 2. Open **Listen to a topic** (or use **Tools → MQTT** if available).
@@ -88,7 +102,7 @@ If you see these, the bridge and broker are good.
 
 ---
 
-## 6. See entities in Home Assistant
+### 6. See entities in Home Assistant
 
 With **HA_DISCOVERY_ENABLED=true**, the bridge publishes MQTT discovery messages. HA should create entities after a short delay (or after **Settings → Devices & services → MQTT → Reload** if your HA has it).
 
@@ -104,7 +118,7 @@ Entity types you’ll get:
 
 ---
 
-## 7. Control and limits (important)
+### 7. Control and limits (important)
 
 - **Read-only points** (sensors): HA shows live values from the BACnet server; no control.
 - **Commandable points** (setpoints, switches): HA shows state. **Writes from HA to MQTT are currently not applied** to commandable points (the server skips them to avoid conflicting with BACnet priority). Control those via the BACnet API (e.g. JSON-RPC) or a future bridge update.
@@ -113,17 +127,17 @@ So: use this setup to **monitor** all points in HA and to **control** only non-c
 
 ---
 
-## 8. Optional env vars (reference)
+### 8. Optional env vars (reference)
 
 | Variable | Default | Description |
-| -------- | ------- | ------------ |
+| -------- | ------- | ----------- |
 | `MQTT_BASE_TOPIC` | `bacnet2mqtt` | Topic prefix for state and commands. |
 | `MQTT_POLL_INTERVAL_SEC` | `30` | How often the bridge publishes each point’s state. |
 | `MQTT_USER` / `MQTT_PASSWORD` | — | Broker username/password if required. |
 
 ---
 
-## 9. Troubleshooting (browser-only)
+### 9. Troubleshooting (browser-only)
 
 - **No entities**
   - Confirm `HA_DISCOVERY_ENABLED=true` and the server was restarted.
@@ -144,11 +158,12 @@ So: use this setup to **monitor** all points in HA and to **control** only non-c
 
 ## Quick checklist
 
-- [ ] MQTT broker installed and running (e.g. Mosquitto add-on in HA).
+- [ ] MQTT broker installed and running (e.g. Mosquitto add-on in HA, or Open-FDD `--with-mqtt-bridge`).
 - [ ] MQTT integration added in HA and connected.
 - [ ] BACnet server run with `BACNET2MQTT_ENABLED=true`, `MQTT_BROKER_URL=...`, `HA_DISCOVERY_ENABLED=true`.
 - [ ] MQTT Listen shows `bacnet2mqtt/bridge/state` = online and `bacnet2mqtt/<point_name>` messages.
 - [ ] Entities appear under MQTT device in HA; sensors show values.
 - [ ] Remember: commandable points are read-only from HA for now; use BACnet/API to change them.
+- [ ] (Optional future) MQTT RPC gateway: see main **README** and Open-FDD **docs/howto/mqtt_integration.md**.
 
 Done. You’re good to try the integration yourself from the browser.

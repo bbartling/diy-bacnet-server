@@ -21,6 +21,13 @@ def test_device_instance_range_valid():
     assert r.end_instance == 3456799
 
 
+def test_device_instance_range_defaults_match_open_fdd_whois():
+    """Same defaults as open_fdd/platform/api/bacnet.py WhoIsRequestRange."""
+    r = DeviceInstanceRange()
+    assert r.start_instance == 1
+    assert r.end_instance == 3456799
+
+
 def test_device_instance_range_invalid_bounds():
     with pytest.raises(ValidationError):
         DeviceInstanceRange(start_instance=1, end_instance=99999999)
