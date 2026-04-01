@@ -1,6 +1,8 @@
+import os
+import shutil
 import subprocess
 import time
-import os
+
 import pytest
 
 COMPOSE_FILE = os.path.join(os.path.dirname(__file__), "docker-compose.yml")
@@ -9,35 +11,45 @@ SERVICE_NAME = "diy-bacnet-server-test"
 
 def get_compose_command():
     """
-    Determines if the system uses 'docker compose' (V2) or 'docker-compose' (V1).
-    Returns the command list prefix to use in subprocess calls.
-    """
-    # 1. Try the modern 'docker compose' (V2 plugin)
-    try:
-        subprocess.run(
-            ["docker", "compose", "version"],
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        print("\n[Test Setup] Using modern 'docker compose' (V2)")
-        return ["docker", "compose"]
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        pass
+    Return a command prefix for docker compose, or None if neither V2 nor V1 is usable.
 
-    # 2. Fallback to legacy 'docker-compose' (V1 standalone)
-    print("\n[Test Setup] Falling back to legacy 'docker-compose' (V1)")
-    return ["docker-compose"]
+    Uses shutil.which so we never return a bare 'docker-compose' name that is not on PATH
+    (e.g. inside openfdd_bacnet_server, where there is no Docker CLI at all).
+    """
+    docker = shutil.which("docker")
+    if docker:
+        try:
+            subprocess.run(
+                [docker, "compose", "version"],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=30,
+            )
+            print("\n[Test Setup] Using modern 'docker compose' (V2)")
+            return [docker, "compose"]
+        except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+
+    docker_compose_v1 = shutil.which("docker-compose")
+    if docker_compose_v1:
+        print("\n[Test Setup] Using legacy 'docker-compose' (V1)")
+        return [docker_compose_v1]
+
+    return None
 
 
 @pytest.fixture(scope="module")
 def run_docker_compose():
     """Start the BACnet server container for the duration of the test module."""
-    
-    # DYNAMICALLY GET THE COMMAND HERE
     compose_cmd = get_compose_command()
+    if not compose_cmd:
+        pytest.skip(
+            "Docker Compose not on PATH — cannot run nested compose stack "
+            "(expected inside minimal runtime images without Docker; run this test on the host or with a DinD/socket setup)."
+        )
 
-    # Build the full command: ['docker', 'compose', '-f', ...] or ['docker-compose', '-f', ...]
+    # Build the full command: ['docker', 'compose', '-f', ...] or ['/path/docker-compose', '-f', ...]
     up_cmd = compose_cmd + ["-f", COMPOSE_FILE, "up", "-d"]
     down_cmd = compose_cmd + ["-f", COMPOSE_FILE, "down", "-v"]
 
