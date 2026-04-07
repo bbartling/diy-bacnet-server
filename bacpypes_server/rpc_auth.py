@@ -1,11 +1,8 @@
 """Optional Bearer auth for JSON-RPC HTTP (set BACNET_RPC_API_KEY).
 
-Exempt paths: /server_hello (health / bootstrap verify), /docs*, /redoc, /openapi.json, /
-so Swagger UI can load.
-
-OpenAPI uses the same BearerAuth scheme and global security as Open-FDD (HTTP Bearer,
-bearerFormat \"API Key\") so **Authorize** in Swagger UI behaves the same; use the same
-paste-the-key flow as the platform API docs.
+Exempt paths: /server_hello (health / bootstrap verify) and GET / (minimal service info).
+Interactive Swagger/OpenAPI HTTP routes are disabled on the app; schema is still available
+via ``app.openapi()`` for tooling.
 """
 
 from __future__ import annotations
@@ -23,10 +20,17 @@ from starlette.types import ASGIApp
 def rpc_auth_path_exempt(path: str) -> bool:
     if path == "/server_hello":
         return True
-    if path in ("/", "/redoc", "/openapi.json"):
+    if path == "/":
         return True
-    if path.startswith("/docs"):
-        return True
+    if (os.environ.get("OFDD_ENABLE_OPENAPI_DOCS") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        if path in ("/docs", "/redoc", "/openapi.json"):
+            return True
+        if path.startswith("/docs/") or path.startswith("/redoc/"):
+            return True
     return False
 
 
@@ -56,11 +60,9 @@ class BacnetRpcAuthMiddleware(BaseHTTPMiddleware):
 
 def install_openapi_bearer_for_swagger(app) -> None:
     """
-    Inject the same OpenAPI Bearer pattern as Open-FDD (open_fdd/platform/api/main.py):
-    components.securitySchemes.BearerAuth (http/bearer, bearerFormat API Key) and
-    top-level security so Swagger UI shows Authorize and sends Authorization on Try it out.
-    Always applied so the UI matches the platform API; middleware still enforces only when
-    BACNET_RPC_API_KEY is set.
+    Inject BearerAuth into the generated OpenAPI schema (for ``app.openapi()`` / tooling).
+    HTTP /docs and /openapi.json are disabled on the running app; middleware enforces the key
+    when BACNET_RPC_API_KEY is set.
     """
     def _custom_openapi():
         if app.openapi_schema:
@@ -85,7 +87,7 @@ def install_openapi_bearer_for_swagger(app) -> None:
                 "description": (
                     "When BACNET_RPC_API_KEY is set, use that value "
                     "(Open-FDD: same as `OFDD_BACNET_SERVER_API_KEY` in stack/.env). "
-                    "In Swagger: click Authorize, paste the key, then Try it out."
+                    "Send `Authorization: Bearer <key>` on JSON-RPC requests."
                 ),
             }
         }
@@ -94,6 +96,23 @@ def install_openapi_bearer_for_swagger(app) -> None:
         return app.openapi_schema
 
     app.openapi = _custom_openapi
+
+
+def install_openapi_servers_url_from_env(app) -> None:
+    """If BACNET_SWAGGER_SERVERS_URL is set (e.g. /bacnet behind Caddy), set OpenAPI servers so Swagger Try it out uses HTTPS + prefix."""
+    base = (os.environ.get("BACNET_SWAGGER_SERVERS_URL") or "").strip()
+    if not base:
+        return
+    _prev = app.openapi
+
+    def _combined_openapi():
+        if app.openapi_schema is not None:
+            return app.openapi_schema
+        schema = _prev()
+        schema["servers"] = [{"url": base}]
+        return schema
+
+    app.openapi = _combined_openapi
 
 
 def install_rpc_auth_if_configured(app) -> None:

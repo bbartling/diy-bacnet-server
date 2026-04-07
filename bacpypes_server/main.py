@@ -87,7 +87,7 @@ async def main():
     config = uvicorn.Config(app=rpc_api, host=host, port=8080, log_level="debug")
     server = uvicorn.Server(config)
 
-    logger.info(f"JSON-RPC API ready at http://{host}:8080/docs")
+    logger.info(f"JSON-RPC API ready at http://{host}:8080 (docs disabled; use Open-FDD or JSON-RPC)")
     try:
         await server.serve()
     finally:

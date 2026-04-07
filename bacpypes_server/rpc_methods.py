@@ -78,7 +78,7 @@ def parse_object_identifier(oid_str: str) -> ObjectIdentifier:
 
 @rpc.method()
 def server_hello() -> dict:
-    return {"message": "BACnet RPC API ready. Use /docs to test."}
+    return {"message": "BACnet RPC API ready. Interactive docs are disabled; use Open-FDD BACnet tools or JSON-RPC."}
 
 
 # ──────── BACNET SERVER UTILS METHODS ────────
@@ -214,7 +214,7 @@ async def client_write_property(request: WritePropertyRequest) -> dict:
             object_identifier=request.object_identifier,
             property_identifier=request.property_identifier,
             value=request.value,
-            priority=request.priority or -1,
+            priority=request.priority,
         )
     except Exception as e:
         logger.error(f"Write property failed: {e}")

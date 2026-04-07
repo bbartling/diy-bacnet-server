@@ -90,6 +90,18 @@ def test_write_property_request_release_null():
     assert r.priority == 8
 
 
+def test_write_property_request_release_json_null():
+    r = WritePropertyRequest(
+        device_instance=3456789,
+        object_identifier="analog-value,2",
+        property_identifier="present-value",
+        value=None,
+        priority=8,
+    )
+    assert r.value is None
+    assert r.priority == 8
+
+
 def test_write_property_request_invalid_property():
     with pytest.raises(ValidationError):
         WritePropertyRequest(

@@ -83,10 +83,7 @@ def test_openapi_matches_open_fdd_bearerauth_shape():
     """Same components.securitySchemes + global security as open_fdd/platform/api/main.py."""
     from bacpypes_server.rpc_app import rpc_api
 
-    c = TestClient(rpc_api)
-    r = c.get("/openapi.json")
-    assert r.status_code == 200
-    data = r.json()
+    data = rpc_api.openapi()
     bearer = data["components"]["securitySchemes"]["BearerAuth"]
     assert bearer == {
         "type": "http",
@@ -95,7 +92,7 @@ def test_openapi_matches_open_fdd_bearerauth_shape():
         "description": (
             "When BACNET_RPC_API_KEY is set, use that value "
             "(Open-FDD: same as `OFDD_BACNET_SERVER_API_KEY` in stack/.env). "
-            "In Swagger: click Authorize, paste the key, then Try it out."
+            "Send `Authorization: Bearer <key>` on JSON-RPC requests."
         ),
     }
     assert data.get("security") == [{"BearerAuth": []}]

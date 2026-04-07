@@ -31,12 +31,23 @@ def _make_app_with_auth():
     return app
 
 
-def test_path_exempt_server_hello():
+def test_path_exempt_server_hello(monkeypatch):
+    # Open-FDD HTTP lab sets OFDD_ENABLE_OPENAPI_DOCS=true in the container; tests must not
+    # inherit that when asserting the "docs off" security posture.
+    monkeypatch.delenv("OFDD_ENABLE_OPENAPI_DOCS", raising=False)
     assert rpc_auth_path_exempt("/server_hello") is True
+    assert rpc_auth_path_exempt("/") is True
     assert rpc_auth_path_exempt("/client_read_property") is False
+    assert rpc_auth_path_exempt("/docs") is False
+    assert rpc_auth_path_exempt("/openapi.json") is False
+
+
+def test_path_exempt_openapi_when_docs_enabled(monkeypatch):
+    monkeypatch.setenv("OFDD_ENABLE_OPENAPI_DOCS", "true")
     assert rpc_auth_path_exempt("/docs") is True
-    assert rpc_auth_path_exempt("/docs/oauth2-redirect") is True
     assert rpc_auth_path_exempt("/openapi.json") is True
+    assert rpc_auth_path_exempt("/redoc") is True
+    assert rpc_auth_path_exempt("/client_read_property") is False
 
 
 def test_server_hello_without_bearer_ok():
@@ -69,7 +80,15 @@ def test_rpc_correct_bearer_ok():
     assert r.status_code == 200
 
 
-def test_openapi_exempt_without_bearer():
+def test_openapi_requires_bearer(monkeypatch):
+    monkeypatch.delenv("OFDD_ENABLE_OPENAPI_DOCS", raising=False)
+    client = TestClient(_make_app_with_auth())
+    r = client.get("/openapi.json")
+    assert r.status_code == 401
+
+
+def test_openapi_public_when_docs_enabled(monkeypatch):
+    monkeypatch.setenv("OFDD_ENABLE_OPENAPI_DOCS", "true")
     client = TestClient(_make_app_with_auth())
     r = client.get("/openapi.json")
     assert r.status_code == 200

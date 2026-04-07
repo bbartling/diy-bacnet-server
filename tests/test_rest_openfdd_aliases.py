@@ -12,8 +12,7 @@ def no_rpc_key(monkeypatch):
 def test_openapi_bacnet_whois_rest_example_matches_openfdd(no_rpc_key):
     from bacpypes_server.rpc_app import rpc_api
 
-    c = TestClient(rpc_api)
-    schema = c.get("/openapi.json").json()
+    schema = rpc_api.openapi()
     assert "/bacnet/whois_range" in (schema.get("paths") or {})
     post = schema["paths"]["/bacnet/whois_range"]["post"]
     content = (post.get("requestBody") or {}).get("content", {}).get("application/json") or {}

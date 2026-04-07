@@ -179,26 +179,34 @@ async def bacnet_write(
     device_instance: int,
     object_identifier: str,
     property_identifier: str,
-    value: Union[float, int, str],
-    priority: int = -1,
+    value: Union[float, int, str, None],
+    priority: Optional[int] = None,
 ):
     try:
         address = await get_device_address(device_instance)
         obj_id = ObjectIdentifier(object_identifier)
         prop_id, prop_idx = parse_property_identifier(property_identifier)
 
-        if value == "null":
-            if priority is None:
+        is_release = value is None or value == "null" or (
+            isinstance(value, str) and value.strip().lower() == "null"
+        )
+        if is_release:
+            if priority is None or not (1 <= int(priority) <= 16):
                 raise HTTPException(
                     status_code=400,
-                    detail="Null requires a priority to release override",
+                    detail="Null requires a priority (1–16) to release override",
                 )
             value = Null(())
+            write_priority = int(priority)
+        else:
+            write_priority = int(priority) if priority is not None else -1
 
         result = await app.write_property(
-            address, obj_id, prop_id, value, prop_idx, priority
+            address, obj_id, prop_id, value, prop_idx, write_priority
         )
         return {"status": "success", "response": str(result)}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Write failed: {e}")
 

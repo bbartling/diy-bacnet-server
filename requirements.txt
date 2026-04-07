@@ -7,3 +7,4 @@ pytest-asyncio
 requests
 httpx
 aiomqtt  # BACnet2MQTT bridge
+pyModbusTCP>=0.2.0

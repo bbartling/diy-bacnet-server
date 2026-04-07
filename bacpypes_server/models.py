@@ -125,8 +125,9 @@ class WritePropertyRequest(BaseModel):
     property_identifier: str = Field(
         ..., description="BACnet property name like 'present-value'"
     )
-    value: Union[float, int, str] = Field(
-        ..., description="Value to write, use 'null' (as string) to release override"
+    value: Union[float, int, str, None] = Field(
+        ...,
+        description="Value to write; JSON null or the string 'null' releases override at the given priority",
     )
     priority: Optional[conint(ge=1, le=16)] = Field(
         default=None,
