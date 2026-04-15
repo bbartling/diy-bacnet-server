@@ -24,6 +24,8 @@ MQTT_RPC_METHOD_NAMES: tuple[str, ...] = (
     "server_update_points",
     "server_read_commandable",
     "server_read_all_values",
+    "server_read_schedule",
+    "server_update_schedule",
     "client_read_property",
     "client_write_property",
     "client_read_multiple",
@@ -148,6 +150,8 @@ async def dispatch_mqtt_rpc(method: str, params: Optional[dict]) -> tuple[str, A
         PointUpdate,
         ReadMultiplePropertiesRequestWrapper,
         ReadPriorityArrayRequest,
+        ServerScheduleReadRequest,
+        ServerScheduleUpdateRequest,
         SingleReadRequest,
         WritePropertyRequest,
     )
@@ -165,6 +169,12 @@ async def dispatch_mqtt_rpc(method: str, params: Optional[dict]) -> tuple[str, A
             out = rpc_methods.server_read_commandable()
         elif method == "server_read_all_values":
             out = rpc_methods.server_read_all_values()
+        elif method == "server_read_schedule":
+            req = ServerScheduleReadRequest.model_validate(p.get("request", p))
+            out = rpc_methods.server_read_schedule(req)
+        elif method == "server_update_schedule":
+            req = ServerScheduleUpdateRequest.model_validate(p.get("update", p))
+            out = rpc_methods.server_update_schedule(req)
         elif method == "client_read_property":
             req = SingleReadRequest.model_validate(p.get("request", p))
             out = await rpc_methods.client_read_property(req)

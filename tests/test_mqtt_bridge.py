@@ -8,8 +8,6 @@ from bacpypes_server.mqtt_bridge import (
     parse_set_payload,
     build_bridge_devices_json,
     build_state_payload,
-    build_ha_discovery_payload,
-    ha_object_id,
     _point_type_and_units,
     DEFAULT_BASE_TOPIC,
 )
@@ -40,7 +38,6 @@ def test_get_bridge_config_returns_config_when_enabled(monkeypatch):
     assert cfg["base_topic"] == DEFAULT_BASE_TOPIC
     assert cfg["broker_url"] == "mqtt://broker:1883"
     assert cfg["poll_interval_sec"] >= 1.0
-    assert "ha_discovery_enabled" in cfg
 
 
 def test_get_bridge_config_custom_base_topic(monkeypatch):
@@ -191,46 +188,6 @@ async def test_build_state_payload_bv():
     assert payload["present_value"] == "active"
 
 
-# ─── HA discovery ─────────────────────────────────────────────────────────────
-
-def test_ha_object_id_sanitize():
-    """Spaces and special chars become underscore."""
-    assert ha_object_id("outdoor-temp") == "outdoor-temp"
-    assert ha_object_id("outdoor temp") == "outdoor_temp"
-    assert " " not in ha_object_id("a b c")
-
-
-def test_build_ha_discovery_payload_sensor():
-    """AV read-only -> sensor component, state_topic and availability."""
-    topic, config = build_ha_discovery_payload(
-        "bacnet2mqtt", "homeassistant", "outdoor-temp", "AV", False, "degreesFahrenheit"
-    )
-    assert topic == "homeassistant/sensor/outdoor-temp/config"
-    assert config["state_topic"] == "bacnet2mqtt/outdoor-temp"
-    assert config["availability_topic"] == "bacnet2mqtt/bridge/state"
-    assert "command_topic" not in config
-
-
-def test_build_ha_discovery_payload_number():
-    """AV commandable -> number component with command_topic."""
-    topic, config = build_ha_discovery_payload(
-        "bacnet2mqtt", "homeassistant", "setpoint-temp", "AV", True, "degreesFahrenheit"
-    )
-    assert topic == "homeassistant/number/setpoint-temp/config"
-    assert config["command_topic"] == "bacnet2mqtt/setpoint-temp/set"
-
-
-def test_build_ha_discovery_payload_switch():
-    """BV commandable -> switch with command_topic."""
-    topic, config = build_ha_discovery_payload(
-        "bacnet2mqtt", "homeassistant", "opt-enable", "BV", True, None
-    )
-    assert topic == "homeassistant/switch/opt-enable/config"
-    assert config["command_topic"] == "bacnet2mqtt/opt-enable/set"
-    assert config["payload_on"] == "active"
-    assert config["payload_off"] == "inactive"
-
-
 # ─── New point types: AI, AO, BI, BO, MSI, MSO, MSV ─────────────────────────
 
 @pytest.mark.asyncio
@@ -317,21 +274,6 @@ async def test_parse_set_payload_multistate():
     point_map = {"mode": obj}
     assert parse_set_payload("mode", b"3", point_map) == 3
     assert parse_set_payload("mode", b"1", point_map) == 1
-
-
-def test_build_ha_discovery_payload_multistate():
-    """MSI read-only -> sensor; MSO commandable -> number with command_topic."""
-    topic_sensor, config_sensor = build_ha_discovery_payload(
-        "bacnet2mqtt", "homeassistant", "mode-in", "MSI", False, None
-    )
-    assert "sensor" in topic_sensor
-    assert config_sensor["state_topic"] == "bacnet2mqtt/mode-in"
-
-    topic_num, config_num = build_ha_discovery_payload(
-        "bacnet2mqtt", "homeassistant", "mode-out", "MSO", True, None
-    )
-    assert "number" in topic_num
-    assert config_num["command_topic"] == "bacnet2mqtt/mode-out/set"
 
 
 # ─── Schedule object (bacpypes3.local.schedule) ──────────────────────────────

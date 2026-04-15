@@ -1,4 +1,6 @@
 Name,PointType,Units,Commandable,Default
 optimization-enable,BV,Status,Y,active
-setpoint-temp,AV,degreesFahrenheit,Y,72.5
-outdoor-temp,AV,degreesFahrenheit,N,22.0
+occupancy-schedule,Schedule,Status,N,0
+web-weather-dry-bulb,AV,degreesFahrenheit,N,22.0
+web-weather-relative-humidity,AV,percent,N,45.0
+web-weather-dew-point,AV,degreesFahrenheit,N,12.0

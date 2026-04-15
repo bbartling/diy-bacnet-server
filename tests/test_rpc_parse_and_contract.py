@@ -81,3 +81,21 @@ def test_client_whois_range_request_shape(rpc_app):
         assert "data" in data["result"] or "success" in data["result"]
     if "error" in data:
         assert "message" in data["error"] or "data" in data["error"]
+
+
+def test_server_read_schedule_request_shape(rpc_app):
+    """POST /server_read_schedule accepts request wrapper and returns JSON-RPC result."""
+    from fastapi.testclient import TestClient
+
+    client = TestClient(rpc_app)
+    payload = {
+        "jsonrpc": "2.0",
+        "id": "1",
+        "method": "server_read_schedule",
+        "params": {"request": {"name": "occupancy-schedule"}},
+    }
+    resp = client.post("/server_read_schedule", json=payload, headers=_rpc_auth_headers())
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "result" in data
+    assert "status" in data["result"]

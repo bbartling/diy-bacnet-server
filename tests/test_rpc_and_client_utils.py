@@ -5,6 +5,9 @@ import pytest
 from bacpypes_server.models import DeviceInstanceOnly, DeviceInstanceRange
 import bacpypes_server.rpc_methods as rpc_methods
 import bacpypes_server.client_utils as client_utils
+from bacpypes3.local.schedule import ScheduleObject
+from bacpypes3.basetypes import DateRange, DailySchedule, TimeValue
+from bacpypes3.primitivedata import Date, Time, Integer
 
 
 @pytest.mark.asyncio
@@ -143,4 +146,75 @@ async def test_client_point_discovery_mocked(monkeypatch):
     assert response.data["device_instance"] == 3456789
     assert len(response.data["objects"]) == 2
     assert response.data["objects"][0]["object_identifier"] == "analog-value,1"
+
+
+def _bacnet_date(y: int, m: int, d: int) -> Date:
+    import datetime as _dt
+
+    dt = _dt.datetime(y, m, d)
+    return Date((y - 1900, m, d, dt.weekday() + 1))
+
+
+def _tv(h: int, m: int, s: int, val: int) -> TimeValue:
+    return TimeValue(time=Time((h, m, s, 0)), value=Integer(val))
+
+
+def _build_schedule_object(name: str = "occupancy-schedule") -> ScheduleObject:
+    weekday = DailySchedule(daySchedule=[_tv(8, 0, 0, 1), _tv(17, 0, 0, 0)])
+    weekend = DailySchedule(daySchedule=[_tv(0, 0, 0, 0)])
+    weekly = [weekday, weekday, weekday, weekday, weekday, weekend, weekend]
+    return ScheduleObject(
+        objectIdentifier=("schedule", 1),
+        objectName=name,
+        presentValue=Integer(0),
+        effectivePeriod=DateRange(
+            startDate=_bacnet_date(2024, 1, 1),
+            endDate=_bacnet_date(2030, 12, 31),
+        ),
+        weeklySchedule=weekly,
+        exceptionSchedule=[],
+        scheduleDefault=Integer(0),
+        listOfObjectPropertyReferences=[],
+        priorityForWriting=1,
+        statusFlags=[0, 0, 0, 0],
+        reliability="noFaultDetected",
+        outOfService=False,
+    )
+
+
+@pytest.mark.asyncio
+async def test_server_read_schedule_returns_schedule(monkeypatch):
+    obj = _build_schedule_object()
+    monkeypatch.setitem(rpc_methods.point_map, "occupancy-schedule", obj)
+    req = rpc_methods.ServerScheduleReadRequest(name="occupancy-schedule")
+    result = rpc_methods.server_read_schedule(req)
+    assert result["status"] == "ok"
+    assert result["schedule"]["object_name"] == "occupancy-schedule"
+    assert len(result["schedule"]["weekly_schedule"]) == 7
+
+
+@pytest.mark.asyncio
+async def test_server_update_schedule_updates_default_and_weekly(monkeypatch):
+    obj = _build_schedule_object()
+    monkeypatch.setitem(rpc_methods.point_map, "occupancy-schedule", obj)
+    req = rpc_methods.ServerScheduleUpdateRequest.model_validate(
+        {
+            "name": "occupancy-schedule",
+            "schedule_default": 1,
+            "weekly_schedule": [
+                [{"time": "08:00", "value": 1}, {"time": "18:00", "value": 0}],
+                [{"time": "08:00", "value": 1}, {"time": "18:00", "value": 0}],
+                [{"time": "08:00", "value": 1}, {"time": "18:00", "value": 0}],
+                [{"time": "08:00", "value": 1}, {"time": "18:00", "value": 0}],
+                [{"time": "08:00", "value": 1}, {"time": "18:00", "value": 0}],
+                [{"time": "00:00", "value": 0}],
+                [{"time": "00:00", "value": 0}],
+            ],
+        }
+    )
+    result = rpc_methods.server_update_schedule(req)
+    assert result["status"] == "updated"
+    assert result["changed"]["schedule_default"] == 1
+    assert result["changed"]["weekly_schedule_days"] == 7
+    assert "18:00:00" in result["schedule"]["weekly_schedule"][0][1]["time"]
 

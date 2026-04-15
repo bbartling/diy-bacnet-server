@@ -11,6 +11,9 @@ from bacpypes_server.models import (
     ReadMultiplePropertiesRequest,
     ReadMultiplePropertiesRequestWrapper,
     ReadPriorityArrayRequest,
+    ServerScheduleReadRequest,
+    ServerScheduleUpdateRequest,
+    ScheduleTimeValue,
     parse_object_identifier_parts,
 )
 
@@ -163,3 +166,43 @@ def test_bacpypes3_object_identifier_formats():
     # String form: bacpypes3 accepts "object-type,instance" (hyphenated)
     oid_from_str = ObjectIdentifier("analog-value,1")
     assert oid_from_str is not None
+
+
+def test_server_schedule_read_request_valid():
+    req = ServerScheduleReadRequest(name="occupancy-schedule")
+    assert req.name == "occupancy-schedule"
+
+
+def test_schedule_time_value_accepts_hhmm_and_normalizes():
+    tv = ScheduleTimeValue(time="08:30", value=1)
+    assert tv.time == "08:30:00"
+    assert tv.value == 1
+
+
+def test_server_schedule_update_request_requires_7_days():
+    with pytest.raises(ValidationError):
+        ServerScheduleUpdateRequest(
+            name="occupancy-schedule",
+            weekly_schedule=[
+                [{"time": "08:00", "value": 1}],
+                [{"time": "08:00", "value": 1}],
+            ],
+        )
+
+
+def test_server_schedule_update_request_valid():
+    req = ServerScheduleUpdateRequest(
+        name="occupancy-schedule",
+        schedule_default=0,
+        weekly_schedule=[
+            [{"time": "08:00:00", "value": 1}, {"time": "17:00:00", "value": 0}],
+            [{"time": "08:00:00", "value": 1}, {"time": "17:00:00", "value": 0}],
+            [{"time": "08:00:00", "value": 1}, {"time": "17:00:00", "value": 0}],
+            [{"time": "08:00:00", "value": 1}, {"time": "17:00:00", "value": 0}],
+            [{"time": "08:00:00", "value": 1}, {"time": "17:00:00", "value": 0}],
+            [{"time": "00:00:00", "value": 0}],
+            [{"time": "00:00:00", "value": 0}],
+        ],
+    )
+    assert req.name == "occupancy-schedule"
+    assert len(req.weekly_schedule or []) == 7

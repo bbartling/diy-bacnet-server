@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import pytest
 
 from bacpypes_server.mqtt_rpc_gateway import (
     MQTT_RPC_METHOD_NAMES,
@@ -10,6 +11,10 @@ from bacpypes_server.mqtt_rpc_gateway import (
     get_mqtt_rpc_gateway_config,
     parse_mqtt_command_payload,
 )
+import bacpypes_server.rpc_methods as rpc_methods
+from bacpypes3.local.schedule import ScheduleObject
+from bacpypes3.basetypes import DateRange, DailySchedule, TimeValue
+from bacpypes3.primitivedata import Date, Time, Integer
 
 
 def test_gateway_config_disabled_by_default(monkeypatch):
@@ -128,7 +133,71 @@ def test_dispatch_server_read_all_values():
     assert isinstance(body, dict)
 
 
+def _bacnet_date(y: int, m: int, d: int) -> Date:
+    import datetime as _dt
+
+    dt = _dt.datetime(y, m, d)
+    return Date((y - 1900, m, d, dt.weekday() + 1))
+
+
+def _tv(h: int, m: int, s: int, val: int) -> TimeValue:
+    return TimeValue(time=Time((h, m, s, 0)), value=Integer(val))
+
+
+def _build_schedule_object(name: str = "occupancy-schedule") -> ScheduleObject:
+    weekday = DailySchedule(daySchedule=[_tv(8, 0, 0, 1), _tv(17, 0, 0, 0)])
+    weekend = DailySchedule(daySchedule=[_tv(0, 0, 0, 0)])
+    weekly = [weekday, weekday, weekday, weekday, weekday, weekend, weekend]
+    return ScheduleObject(
+        objectIdentifier=("schedule", 1),
+        objectName=name,
+        presentValue=Integer(0),
+        effectivePeriod=DateRange(
+            startDate=_bacnet_date(2024, 1, 1),
+            endDate=_bacnet_date(2030, 12, 31),
+        ),
+        weeklySchedule=weekly,
+        exceptionSchedule=[],
+        scheduleDefault=Integer(0),
+        listOfObjectPropertyReferences=[],
+        priorityForWriting=1,
+        statusFlags=[0, 0, 0, 0],
+        reliability="noFaultDetected",
+        outOfService=False,
+    )
+
+
+@pytest.mark.asyncio
+async def test_dispatch_server_read_schedule():
+    rpc_methods.point_map["occupancy-schedule"] = _build_schedule_object()
+    status, body = await dispatch_mqtt_rpc(
+        "server_read_schedule", {"request": {"name": "occupancy-schedule"}}
+    )
+    assert status == "ok"
+    assert body["status"] == "ok"
+    assert body["schedule"]["object_name"] == "occupancy-schedule"
+
+
+@pytest.mark.asyncio
+async def test_dispatch_server_update_schedule():
+    rpc_methods.point_map["occupancy-schedule"] = _build_schedule_object()
+    status, body = await dispatch_mqtt_rpc(
+        "server_update_schedule",
+        {
+            "update": {
+                "name": "occupancy-schedule",
+                "schedule_default": 1,
+            }
+        },
+    )
+    assert status == "ok"
+    assert body["status"] == "updated"
+    assert body["changed"]["schedule_default"] == 1
+
+
 def test_method_names_cover_rpc_surface():
     assert "client_whois_range" in MQTT_RPC_METHOD_NAMES
     assert "client_read_property" in MQTT_RPC_METHOD_NAMES
-    assert len(MQTT_RPC_METHOD_NAMES) >= 10
+    assert "server_read_schedule" in MQTT_RPC_METHOD_NAMES
+    assert "server_update_schedule" in MQTT_RPC_METHOD_NAMES
+    assert len(MQTT_RPC_METHOD_NAMES) >= 12

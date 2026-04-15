@@ -8,6 +8,8 @@ from bacpypes_server.models import (
     DeviceInstanceOnly,
     ReadPriorityArrayRequest,
     SupervisorySummary,
+    ServerScheduleReadRequest,
+    ServerScheduleUpdateRequest,
     parse_object_identifier_parts,
 )
 from bacpypes_server.client_utils import (
@@ -21,6 +23,8 @@ from bacpypes_server.client_utils import (
     supervisory_logic_check,
     read_point_priority_arr,
     perform_who_is_router_to_network,
+    server_schedule_to_json,
+    update_server_schedule,
 )
 from bacpypes_server.server_utils import (
     point_map,
@@ -44,6 +48,7 @@ from bacpypes3.local.multistate import (
     MultiStateOutputObject,
     MultiStateValueObject,
 )
+from bacpypes3.local.schedule import ScheduleObject
 
 from bacpypes_server.errors import (
     DeviceNotFoundError,
@@ -186,6 +191,45 @@ def server_read_all_values() -> dict:
             logger.error(f"Error reading {name}: {e}")
             result[name] = f"error: {e}"
     return result
+
+
+@rpc.method()
+def server_read_schedule(request: ServerScheduleReadRequest) -> dict:
+    obj = point_map.get(request.name)
+    if obj is None:
+        return {"name": request.name, "status": "not found"}
+    if not isinstance(obj, ScheduleObject):
+        return {
+            "name": request.name,
+            "status": "error",
+            "detail": "point exists but is not a Schedule object",
+        }
+    return {"name": request.name, "status": "ok", "schedule": server_schedule_to_json(obj)}
+
+
+@rpc.method()
+def server_update_schedule(update: ServerScheduleUpdateRequest) -> dict:
+    obj = point_map.get(update.name)
+    if obj is None:
+        return {"name": update.name, "status": "not found"}
+    if not isinstance(obj, ScheduleObject):
+        return {
+            "name": update.name,
+            "status": "error",
+            "detail": "point exists but is not a Schedule object",
+        }
+
+    changed = update_server_schedule(
+        obj=obj,
+        schedule_default=update.schedule_default,
+        weekly_schedule=update.weekly_schedule,
+    )
+    return {
+        "name": update.name,
+        "status": "updated",
+        "changed": changed,
+        "schedule": server_schedule_to_json(obj),
+    }
 
 
 # ──────── BACNET CLIENT UTILS METHODS ────────

@@ -1,10 +1,9 @@
 # mqtt_bridge.py — BACnet2MQTT bridge: local points <-> MQTT state/command topics.
-# Gated by BACNET2MQTT_ENABLED. HA discovery gated by HA_DISCOVERY_ENABLED.
+# Gated by BACNET2MQTT_ENABLED.
 import asyncio
 import json
 import logging
 import os
-import re
 from typing import Any, Optional
 
 from bacpypes3.local.analog import (
@@ -30,7 +29,6 @@ logger = logging.getLogger("mqtt_bridge")
 # Defaults (overridden by env)
 DEFAULT_BASE_TOPIC = "bacnet2mqtt"
 DEFAULT_POLL_INTERVAL_SEC = 30.0
-DEFAULT_HA_DISCOVERY_TOPIC = "homeassistant"
 RECONNECT_DELAY_SEC = 5.0
 
 
@@ -47,16 +45,12 @@ def get_bridge_config() -> Optional[dict]:
         poll_interval = float(os.environ.get("MQTT_POLL_INTERVAL_SEC", DEFAULT_POLL_INTERVAL_SEC))
     except ValueError:
         poll_interval = DEFAULT_POLL_INTERVAL_SEC
-    ha_enabled = os.environ.get("HA_DISCOVERY_ENABLED", "").strip().lower() in ("1", "true", "yes")
-    ha_topic = os.environ.get("HA_DISCOVERY_TOPIC", DEFAULT_HA_DISCOVERY_TOPIC).strip() or DEFAULT_HA_DISCOVERY_TOPIC
     username = os.environ.get("MQTT_USER", "").strip() or None
     password = os.environ.get("MQTT_PASSWORD", "").strip() or None
     return {
         "broker_url": url,
         "base_topic": base_topic.rstrip("/"),
         "poll_interval_sec": max(1.0, poll_interval),
-        "ha_discovery_enabled": ha_enabled,
-        "ha_discovery_topic": ha_topic.rstrip("/"),
         "username": username,
         "password": password,
     }
@@ -191,73 +185,6 @@ def build_state_payload(point_map: dict, name: str) -> Optional[dict]:
     return out
 
 
-def ha_object_id(friendly_name: str) -> str:
-    """Sanitize friendly name for HA object_id (replace spaces/special with underscore)."""
-    s = re.sub(r"[^\w\-]", "_", friendly_name)
-    return s.strip("_") or "point"
-
-
-def build_ha_discovery_payload(
-    base_topic: str,
-    discovery_topic: str,
-    friendly_name: str,
-    point_type: str,
-    commandable: bool,
-    units: Optional[str],
-) -> tuple[str, dict]:
-    """Build (topic, config_dict) for HA MQTT discovery. topic = discovery_topic/component/object_id/config."""
-    obj_id = ha_object_id(friendly_name)
-    state_topic = f"{base_topic}/{friendly_name}"
-    availability_topic = f"{base_topic}/bridge/state"
-    payload_available = "online"
-
-    if point_type in ("AI", "AO", "AV"):
-        component = "number" if commandable else "sensor"
-        config = {
-            "name": friendly_name,
-            "state_topic": state_topic,
-            "value_template": "{{ value_json.present_value }}",
-            "availability_topic": availability_topic,
-            "payload_available": payload_available,
-            "payload_not_available": "offline",
-        }
-        if units:
-            config["unit_of_measurement"] = units
-        if commandable:
-            config["command_topic"] = f"{base_topic}/{friendly_name}/set"
-    elif point_type in ("BI", "BO", "BV"):
-        component = "switch" if commandable else "binary_sensor"
-        config = {
-            "name": friendly_name,
-            "state_topic": state_topic,
-            "value_template": "{{ value_json.present_value }}",
-            "payload_on": "active",
-            "payload_off": "inactive",
-            "availability_topic": availability_topic,
-            "payload_available": payload_available,
-            "payload_not_available": "offline",
-        }
-        if commandable:
-            config["command_topic"] = f"{base_topic}/{friendly_name}/set"
-    else:
-        # MSI, MSO, MSV — sensor with integer state; commandable -> number
-        component = "number" if commandable else "sensor"
-        config = {
-            "name": friendly_name,
-            "state_topic": state_topic,
-            "value_template": "{{ value_json.present_value }}",
-            "availability_topic": availability_topic,
-            "payload_available": payload_available,
-            "payload_not_available": "offline",
-        }
-        if commandable:
-            config["command_topic"] = f"{base_topic}/{friendly_name}/set"
-        config["device_class"] = "enum"
-
-    topic = f"{discovery_topic}/{component}/{obj_id}/config"
-    return topic, config
-
-
 async def run_mqtt_bridge(
     point_map: dict,
     commandable_point_names: set,
@@ -275,8 +202,6 @@ async def run_mqtt_bridge(
     base_topic = config["base_topic"]
     broker_url = config["broker_url"]
     poll_interval = config["poll_interval_sec"]
-    ha_enabled = config["ha_discovery_enabled"]
-    ha_topic = config["ha_discovery_topic"]
 
     # Parse broker URL (e.g. mqtt://host:1883)
     host = "localhost"
@@ -339,16 +264,6 @@ async def run_mqtt_bridge(
                     payload=json.dumps(devices_list),
                     retain=True,
                 )
-
-                # HA discovery
-                if ha_enabled:
-                    for name, obj in point_map.items():
-                        ptype, units = _point_type_and_units(obj)
-                        cmd = name in commandable_point_names
-                        topic, payload = build_ha_discovery_payload(
-                            base_topic, ha_topic, name, ptype, cmd, units
-                        )
-                        await client.publish(topic, payload=json.dumps(payload), retain=True)
 
                 await client.subscribe(f"{base_topic}/#")
                 logger.info("BACnet2MQTT bridge connected and subscribed to %s/#", base_topic)

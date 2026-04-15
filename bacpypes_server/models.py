@@ -10,6 +10,7 @@ from pydantic import (
     field_validator,
 )
 from typing import Dict, Union, Optional, List
+from datetime import time as dt_time
 
 from bacpypes3.primitivedata import PropertyIdentifier, ObjectType
 from fastapi import HTTPException
@@ -269,6 +270,72 @@ class ReadPriorityArrayRequest(BaseModel):
             "example": {
                 "device_instance": 987654,
                 "object_identifier": "analog-output,1",
+            }
+        }
+    )
+
+
+class ServerScheduleReadRequest(BaseModel):
+    name: str = Field(..., description="CSV point name for a hosted Schedule object")
+
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"name": "occupancy-schedule"}}
+    )
+
+
+class ScheduleTimeValue(BaseModel):
+    time: str = Field(..., description="Time in HH:MM or HH:MM:SS format")
+    value: Union[int, float, bool] = Field(
+        ..., description="Value applied at the given time"
+    )
+
+    @field_validator("time")
+    @classmethod
+    def validate_time(cls, v: str):
+        text = (v or "").strip()
+        for fmt in ("%H:%M", "%H:%M:%S"):
+            try:
+                parsed = dt_time.fromisoformat(text if fmt == "%H:%M:%S" else f"{text}:00")
+                return f"{parsed.hour:02d}:{parsed.minute:02d}:{parsed.second:02d}"
+            except ValueError:
+                continue
+        raise ValueError("time must be HH:MM or HH:MM:SS")
+
+
+class ServerScheduleUpdateRequest(BaseModel):
+    name: str = Field(..., description="CSV point name for a hosted Schedule object")
+    schedule_default: Optional[Union[int, float, bool]] = Field(
+        default=None,
+        description="Optional schedule-default value",
+    )
+    weekly_schedule: Optional[List[List[ScheduleTimeValue]]] = Field(
+        default=None,
+        description="Optional weekly schedule (7 days, Monday..Sunday)",
+    )
+
+    @field_validator("weekly_schedule")
+    @classmethod
+    def validate_weekly_schedule(cls, v):
+        if v is None:
+            return v
+        if len(v) != 7:
+            raise ValueError("weekly_schedule must contain exactly 7 day schedules")
+        return v
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "occupancy-schedule",
+                "schedule_default": 0,
+                "weekly_schedule": [
+                    [{"time": "08:00:00", "value": 1}, {"time": "17:00:00", "value": 0}],
+                    [{"time": "08:00:00", "value": 1}, {"time": "17:00:00", "value": 0}],
+                    [{"time": "08:00:00", "value": 1}, {"time": "17:00:00", "value": 0}],
+                    [{"time": "08:00:00", "value": 1}, {"time": "17:00:00", "value": 0}],
+                    [{"time": "08:00:00", "value": 1}, {"time": "17:00:00", "value": 0}],
+                    [{"time": "00:00:00", "value": 0}],
+                    [{"time": "00:00:00", "value": 0}],
+                ],
             }
         }
     )

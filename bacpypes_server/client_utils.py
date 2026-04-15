@@ -15,6 +15,9 @@ from bacpypes3.apdu import (
 from bacpypes3.constructeddata import AnyAtomic, Sequence, Array, List
 from bacpypes3.vendor import get_vendor_info
 from bacpypes3.primitivedata import Atomic
+from bacpypes3.primitivedata import Time, Integer, Real
+from bacpypes3.basetypes import DailySchedule, TimeValue
+from bacpypes3.local.schedule import ScheduleObject
 from bacpypes3.json.util import (
     atomic_encode,
     sequence_to_json,
@@ -115,6 +118,78 @@ def _convert_to_object_identifier(obj_id: str) -> ObjectIdentifier:
     """
     object_type, instance_number = obj_id.split(",")
     return ObjectIdentifier((object_type.strip(), int(instance_number.strip())))
+
+
+def _numeric_schedule_value(value):
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)):
+        return value
+    if hasattr(value, "get_value"):
+        return value.get_value()
+    return value
+
+
+def server_schedule_to_json(obj: ScheduleObject) -> dict:
+    weekly = []
+    for day in obj.weeklySchedule or []:
+        entries = []
+        for tv in getattr(day, "daySchedule", []) or []:
+            raw_val = getattr(tv, "value", None)
+            entries.append(
+                {
+                    "time": str(getattr(tv, "time", "")),
+                    "value": _numeric_schedule_value(raw_val),
+                }
+            )
+        weekly.append(entries)
+    return {
+        "object_identifier": str(obj.objectIdentifier),
+        "object_name": str(obj.objectName),
+        "present_value": _numeric_schedule_value(obj.presentValue),
+        "schedule_default": _numeric_schedule_value(obj.scheduleDefault),
+        "weekly_schedule": weekly,
+        "exception_schedule_count": len(obj.exceptionSchedule or []),
+    }
+
+
+def update_server_schedule(
+    obj: ScheduleObject,
+    schedule_default=None,
+    weekly_schedule=None,
+) -> dict:
+    changed: dict = {}
+    if schedule_default is not None:
+        obj.scheduleDefault = (
+            Integer(int(schedule_default))
+            if isinstance(schedule_default, (bool, int))
+            else Real(float(schedule_default))
+        )
+        changed["schedule_default"] = _numeric_schedule_value(obj.scheduleDefault)
+
+    if weekly_schedule is not None:
+        weekly: list[DailySchedule] = []
+        for day in weekly_schedule:
+            day_schedule = []
+            for item in day:
+                hh, mm, ss = [int(x) for x in item.time.split(":")]
+                raw_value = item.value
+                if isinstance(raw_value, bool):
+                    encoded_val = Integer(1 if raw_value else 0)
+                elif isinstance(raw_value, int):
+                    encoded_val = Integer(raw_value)
+                else:
+                    encoded_val = Real(float(raw_value))
+                day_schedule.append(
+                    TimeValue(time=Time((hh, mm, ss, 0)), value=encoded_val)
+                )
+            weekly.append(DailySchedule(daySchedule=day_schedule))
+        obj.weeklySchedule = weekly
+        changed["weekly_schedule_days"] = len(weekly)
+
+    obj.presentValue = obj.scheduleDefault
+    changed["present_value"] = _numeric_schedule_value(obj.presentValue)
+    return changed
 
 
 def parse_property_identifier(property_identifier):
