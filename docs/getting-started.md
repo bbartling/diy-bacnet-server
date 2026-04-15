@@ -14,7 +14,7 @@ cd diy-bacnet-server
 python3 -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
 ## Run from source (module entrypoint)

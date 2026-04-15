@@ -14,22 +14,19 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v5
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python 3.14
         uses: actions/setup-python@v6
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.14"
           cache: pip
 
-      - name: Install dependencies
+      - name: Install project (runtime + dev extras for tests)
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install ".[dev]"
 
       - name: Build combined docs text (sanity; same script as Docs PDF workflow)
         run: |

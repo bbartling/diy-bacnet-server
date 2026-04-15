@@ -12,13 +12,13 @@ Same pattern as **[easy-aso](https://github.com/bbartling/easy-aso)** and **[ope
 
 | Workflow | Purpose |
 |----------|---------|
-| `.github/workflows/ci.yml` | `pip install -r requirements.txt`, `python scripts/build_docs_pdf.py --no-pdf`, `pytest tests/`. |
+| `.github/workflows/ci.yml` | **Python 3.14** on `ubuntu-latest`: `pip install ".[dev]"` (see `pyproject.toml`), `python scripts/build_docs_pdf.py --no-pdf`, `pytest tests/`. |
 | `.github/workflows/docs-pages.yml` | `bundle install` + `jekyll build` from `docs/`, deploy with **deploy-pages**. |
 | `.github/workflows/docs-pdf.yml` | Build `pdf/diy-bacnet-server-docs.pdf` and `.txt`; upload artifacts; try to open a PR when outputs change. |
 
 ## What the CI job runs
 
-The **CI** workflow installs `requirements.txt`, runs `scripts/build_docs_pdf.py --no-pdf` (combined Markdown + text bundle sanity), then runs **`pytest tests/`** — the full test tree, including the **Docker Compose** smoke test in `tests/test_docker_bacnet_server.py` (skipped automatically when Docker Compose is not on `PATH`).
+The **CI** workflow installs the project with **`pip install ".[dev]"`** (runtime deps + `dev` extras from `pyproject.toml`), runs `scripts/build_docs_pdf.py --no-pdf` (combined Markdown + text bundle sanity), then runs **`pytest tests/`** — the full test tree, including the **Docker Compose** smoke test in `tests/test_docker_bacnet_server.py` (skipped automatically when Docker Compose is not on `PATH`).
 
 ## Docs PDF workflow: PR permission
 
@@ -49,7 +49,7 @@ python scripts/build_docs_pdf.py --no-pdf
 ## Tests locally
 
 ```bash
-pip install -r requirements.txt
+pip install -e ".[dev]"
 pytest tests/ -v --tb=short
 ```
 

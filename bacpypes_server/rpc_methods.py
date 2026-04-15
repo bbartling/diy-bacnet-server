@@ -65,6 +65,11 @@ from bacpypes3.json.util import atomic_encode
 from bacpypes3.primitivedata import ObjectIdentifier
 
 import fastapi_jsonrpc as jsonrpc
+
+from bacpypes_server.fastapi_jsonrpc_compat import apply_fastapi_jsonrpc_compat
+
+apply_fastapi_jsonrpc_compat(jsonrpc)
+
 import logging
 import traceback
 

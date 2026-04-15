@@ -50,7 +50,8 @@ def run_docker_compose():
         )
 
     # Build the full command: ['docker', 'compose', '-f', ...] or ['/path/docker-compose', '-f', ...]
-    up_cmd = compose_cmd + ["-f", COMPOSE_FILE, "up", "-d"]
+    # Always rebuild so Dockerfile / pyproject changes are not masked by a stale local image.
+    up_cmd = compose_cmd + ["-f", COMPOSE_FILE, "up", "-d", "--build"]
     down_cmd = compose_cmd + ["-f", COMPOSE_FILE, "down", "-v"]
 
     print(f"[Test Setup] Running command: {' '.join(up_cmd)}")

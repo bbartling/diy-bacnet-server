@@ -1,5 +1,5 @@
 # ---- Base image ----
-FROM python:3.13-slim
+FROM python:3.14-slim
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
@@ -11,9 +11,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
   && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
+# Install from pyproject.toml (unpinned deps; resolve at image build time).
 COPY . /app
+RUN pip install --no-cache-dir .
 EXPOSE 47808/udp
 EXPOSE 5000
 

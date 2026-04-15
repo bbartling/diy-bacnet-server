@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "diy-bacnet-server"
+version = "0.1.0"
+description = "BACnet/IP + JSON-RPC edge microservice for Docker-based deployments; optional Modbus TCP and MQTT."
+readme = "README.md"
+requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["bacnet", "bacpypes3", "json-rpc", "fastapi", "iot", "hvac"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: System :: Networking",
+]
+dependencies = [
+  "bacpypes3",
+  "ifaddr",
+  "fastapi-jsonrpc",
+  "uvicorn",
+  "requests",
+  "httpx",
+  "aiomqtt",
+  "pyModbusTCP>=0.2.0",
+]
+
+[project.optional-dependencies]
+dev = ["black", "pytest", "pytest-asyncio"]
+
+[project.urls]
+Homepage = "https://github.com/bbartling/diy-bacnet-server"
+Repository = "https://github.com/bbartling/diy-bacnet-server"
+Issues = "https://github.com/bbartling/diy-bacnet-server/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bacpypes_server*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
