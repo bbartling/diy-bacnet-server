@@ -1,3 +1,6 @@
+# Regenerate pdf/diy-bacnet-server-docs.pdf (+ .txt) when docs or the builder change.
+# Opens a PR when artifacts change (same pattern as open-fdd / easy-aso).
+
 name: Docs PDF
 
 on:
@@ -7,6 +10,7 @@ on:
       - "docs/**"
       - "scripts/build_docs_pdf.py"
       - ".github/workflows/docs-pdf.yml"
+      - ".github/workflows/docs-pages.yml"
   workflow_dispatch:
 
 permissions:
@@ -50,9 +54,9 @@ jobs:
           commit-message: "chore(docs): regenerate docs PDF and text bundle"
           title: "chore(docs): regenerate docs PDF and text bundle"
           body: |
-            Automated refresh from `.github/workflows/docs-pdf.yml`.
+            Automated refresh from **Docs PDF** workflow ([`.github/workflows/docs-pdf.yml`](.github/workflows/docs-pdf.yml)).
 
-            Merge this PR to keep generated docs artifacts current.
+            Merge when ready so `pdf/diy-bacnet-server-docs.pdf` and `pdf/diy-bacnet-server-docs.txt` stay current.
           add-paths: |
             pdf/diy-bacnet-server-docs.pdf
             pdf/diy-bacnet-server-docs.txt

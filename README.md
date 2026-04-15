@@ -18,11 +18,8 @@ docker run --rm -it --network host --name bens-bacnet diy-bacnet-server \
 
 ## Documentation
 
-Full documentation is in:
-
-- [`docs/index.md`](docs/index.md)
-
-This includes API auth, CSV schema, schedule RPC, MQTT schema/topics, Modbus endpoint, Docker operations, and testing workflows.
+- **Published site:** [bbartling.github.io/diy-bacnet-server](https://bbartling.github.io/diy-bacnet-server/)
+- **Source (Just the Docs):** start at [`docs/index.md`](docs/index.md); topic pages live alongside it under `docs/*.md` (same multi-page style as [easy-aso](https://github.com/bbartling/easy-aso/tree/master/docs)).
 
 ## License
 
