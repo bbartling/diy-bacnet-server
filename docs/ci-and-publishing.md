@@ -14,7 +14,15 @@ Same pattern as **[easy-aso](https://github.com/bbartling/easy-aso)** and **[ope
 |----------|---------|
 | `.github/workflows/ci.yml` | `pip install -r requirements.txt`, `python scripts/build_docs_pdf.py --no-pdf`, `pytest tests/`. |
 | `.github/workflows/docs-pages.yml` | `bundle install` + `jekyll build` from `docs/`, deploy with **deploy-pages**. |
-| `.github/workflows/docs-pdf.yml` | Build `pdf/diy-bacnet-server-docs.pdf` and `.txt`; open a PR when outputs change. |
+| `.github/workflows/docs-pdf.yml` | Build `pdf/diy-bacnet-server-docs.pdf` and `.txt`; upload artifacts; try to open a PR when outputs change. |
+
+## What the CI job runs
+
+The **CI** workflow installs `requirements.txt`, runs `scripts/build_docs_pdf.py --no-pdf` (combined Markdown + text bundle sanity), then runs **`pytest tests/`** — the full test tree, including the **Docker Compose** smoke test in `tests/test_docker_bacnet_server.py` (skipped automatically when Docker Compose is not on `PATH`).
+
+## Docs PDF workflow: PR permission
+
+If you see *“GitHub Actions is not permitted to create or approve pull requests”*, the workflow can still succeed: PDF and `.txt` outputs are **always uploaded as workflow artifacts**. To also get automatic PRs, enable **Settings → Actions → General → Workflow permissions → Allow GitHub Actions to create and approve pull requests** (repo or org policy may override `permissions:` in the YAML file).
 
 ## GitHub Pages (first time)
 

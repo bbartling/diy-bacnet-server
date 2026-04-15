@@ -1,5 +1,11 @@
 ## diy-bacnet-server
 
+[![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2.svg?logo=discord&logoColor=white)](https://discord.gg/Ta48yQF8fC)
+[![CI](https://github.com/bbartling/diy-bacnet-server/actions/workflows/ci.yml/badge.svg)](https://github.com/bbartling/diy-bacnet-server/actions/workflows/ci.yml)
+![MIT License](https://img.shields.io/badge/license-MIT-green.svg)
+![Development Status](https://img.shields.io/badge/status-Beta-blue.svg)
+![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white)
+
 Lightweight BACnet/IP + JSON-RPC edge microservice for Docker-based deployments, including optional Modbus TCP client features.
 
 ## Quick Start
