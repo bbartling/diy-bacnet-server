@@ -31,6 +31,8 @@ python -m bacpypes_server.main --name Lab --instance 999 --debug
 
 Dependencies and optional dev tools (`pytest`, `black`, …) live in **`pyproject.toml`** (PEP 621), not `requirements.txt`.
 
+The Docker image installs the **`test`** extra (`pytest`, `pytest-asyncio`) so sibling stacks such as **open-fdd-afdd-stack** can run `scripts/bootstrap.sh --diy-bacnet-tests` (`docker exec … pytest` in the gateway container).
+
 ## Documentation
 
 - **Published site:** [bbartling.github.io/diy-bacnet-server](https://bbartling.github.io/diy-bacnet-server/)

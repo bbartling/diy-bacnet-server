@@ -12,8 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 # Install from pyproject.toml (unpinned deps; resolve at image build time).
+# Include [test] extra so `python3 -m pytest tests/` works in-container (Open-FDD bootstrap --diy-bacnet-tests).
 COPY . /app
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir ".[test]"
 EXPOSE 47808/udp
 EXPOSE 5000
 
