@@ -40,3 +40,9 @@ Default prefix: **`diy-bacnet/gateway`**
 | `{prefix}/telemetry/status` | Optional periodic status when `MQTT_RPC_TELEMETRY_INTERVAL_SEC` > 0. |
 
 Supported `method` values mirror HTTP JSON-RPC — see **`MQTT_RPC_METHOD_NAMES`** in `bacpypes_server/mqtt_rpc_gateway.py`.
+
+## Related: easy-aso on the same broker
+
+Sibling **easy-aso** containers often publish supervisory telemetry on their **own** topic prefix (for example `easyaso/telemetry/...`) while this server uses **BACnet2MQTT** and **MQTT RPC** topics above. Use one broker URL across Compose services; keep topic trees separate so agents and this server do not fight the same retained topics.
+
+See the **[easy-aso examples README](https://github.com/bbartling/easy-aso/blob/master/examples/README.md)** for MQTT + JSON-RPC patterns next to diy-bacnet-server.

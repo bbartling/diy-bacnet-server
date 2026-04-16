@@ -32,6 +32,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["black", "pytest", "pytest-asyncio"]
+# Minimal deps for `python3 -m pytest tests/` inside the published Docker image (e.g. Open-FDD bootstrap --diy-bacnet-tests).
+test = ["pytest", "pytest-asyncio"]
 
 [project.urls]
 Homepage = "https://github.com/bbartling/diy-bacnet-server"
