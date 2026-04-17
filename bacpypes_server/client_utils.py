@@ -699,9 +699,7 @@ async def supervisory_logic_check(instance_id: int) -> dict:
         if commandable_list:
             try:
                 rpm_requests = [(oid, "priority-array") for oid, _ in commandable_list]
-                rpm_results = await bacnet_rpm_chunked(
-                    Address(device_address), rpm_requests
-                )
+                rpm_results = await bacnet_rpm_chunked(device_address, rpm_requests)
                 for r in rpm_results:
                     if "error" in r:
                         continue
