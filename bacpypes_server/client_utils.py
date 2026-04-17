@@ -105,10 +105,16 @@ def _encode_rpm_value(property_value):  # noqa: C901
     return str(property_value)
 
 
-def _convert_to_address(address: str) -> Address:
+def _convert_to_address(address: Union[str, Address]) -> Address:
     """
-    Convert a string to a BACnet Address object.
+    Normalize to a BACnet Address.
+
+    Callers often pass pduSource from I-Am, which is already an Address.
+    Wrapping again with Address(...) can stringify/reparse incorrectly and
+    raise 'invalid address' for routed or MSTP paths; preserve instances.
     """
+    if isinstance(address, Address):
+        return address
     return Address(address)
 
 
@@ -287,7 +293,7 @@ async def bacnet_write(
 
 
 async def bacnet_rpm(
-    address: Address,
+    address: Union[str, Address],
     *args: str,
 ):
 
@@ -386,7 +392,7 @@ async def bacnet_rpm(
 
 
 async def bacnet_rpm_chunked(
-    address: Address,
+    address: Union[str, Address],
     requests: List[Tuple[str, str]],
     chunk_size: int = RPM_CHUNK_SIZE,
 ) -> List[dict]:
@@ -409,7 +415,12 @@ async def bacnet_rpm_chunked(
             result = await bacnet_rpm(address, *args)
             combined.extend(result)
         except Exception as e:
-            logger.warning(f"RPM chunk failed (chunk size {len(chunk)}): {e}")
+            logger.warning(
+                "RPM chunk failed (chunk size %s): %s; address=%r",
+                len(chunk),
+                e,
+                address,
+            )
             for _ in chunk:
                 combined.append({"error": str(e)})
     return combined
@@ -688,9 +699,7 @@ async def supervisory_logic_check(instance_id: int) -> dict:
         if commandable_list:
             try:
                 rpm_requests = [(oid, "priority-array") for oid, _ in commandable_list]
-                rpm_results = await bacnet_rpm_chunked(
-                    Address(device_address), rpm_requests
-                )
+                rpm_results = await bacnet_rpm_chunked(device_address, rpm_requests)
                 for r in rpm_results:
                     if "error" in r:
                         continue
