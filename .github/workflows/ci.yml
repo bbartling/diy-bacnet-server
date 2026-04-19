@@ -30,7 +30,6 @@ jobs:
 
       - name: Build combined docs text (sanity; same script as Docs PDF workflow)
         run: |
-          pip install pyyaml
           python scripts/build_docs_pdf.py --no-pdf
 
       - name: Run tests

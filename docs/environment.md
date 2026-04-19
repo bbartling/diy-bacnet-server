@@ -13,7 +13,7 @@ nav_order: 10
 | `BACNET_NAME` | Docker entrypoint default BACnet **device name** when not passing a full CLI. |
 | `BACNET_INSTANCE` | Docker entrypoint default **device instance** number. |
 | `BACNET_BIND_ADDRESS` | BACnet/IP bind passed as `--address` (e.g. `192.168.1.10/24:47808`). |
-| `BACNET_HTTP_PUBLIC` | If `0` / `false` / `no`, entrypoint omits `--public` (loopback-only HTTP). |
+| `BACNET_HTTP_PUBLIC` | If `0` / `false` / `no` (trimmed, case-insensitive), entrypoint omits `--public` (loopback-only HTTP). |
 | `BACNET2MQTT_ENABLED` | Enable BACnet2MQTT bridge. |
 | `MQTT_BROKER_URL` | Broker URL for the bridge (and MQTT RPC gateway fallback). |
 | `MQTT_BASE_TOPIC` | Bridge topic prefix. |

@@ -12,9 +12,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 # Install from pyproject.toml (unpinned deps; resolve at image build time).
-# Include [test] extra so `python3 -m pytest tests/` works in-container.
+# Production default: runtime only. Set BUILD_TESTS=true (see Open-FDD stack compose) for pytest in-image.
+ARG BUILD_TESTS=false
 COPY . /app
-RUN pip install --no-cache-dir ".[test]"
+RUN if [ "$BUILD_TESTS" = "true" ]; then \
+      pip install --no-cache-dir ".[test]"; \
+    else \
+      pip install --no-cache-dir "."; \
+    fi
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 EXPOSE 47808/udp

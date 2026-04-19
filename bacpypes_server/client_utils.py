@@ -420,6 +420,7 @@ async def bacnet_rpm_chunked(
                 len(chunk),
                 e,
                 address,
+                exc_info=True,
             )
             for _ in chunk:
                 combined.append({"error": str(e)})

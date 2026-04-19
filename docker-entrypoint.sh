@@ -11,9 +11,13 @@ inst="${BACNET_INSTANCE:-${OFDD_BACNET_DEVICE_INSTANCE:-123456}}"
 bind="${BACNET_BIND_ADDRESS:-${OFDD_BACNET_ADDRESS:-}}"
 
 # HTTP: default --public (0.0.0.0:8080). Set BACNET_HTTP_PUBLIC=0|false|no for loopback-only.
+# Normalize like Python env parsing: trim whitespace, lowercase, then match disable literals only.
 pub=""
-case "${BACNET_HTTP_PUBLIC:-1}" in
-  0|false|no|False|NO) ;;
+_hp_raw="${BACNET_HTTP_PUBLIC:-1}"
+_hp=$(printf '%s' "$_hp_raw" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | tr '[:upper:]' '[:lower:]')
+[ -z "$_hp" ] && _hp="1"
+case "$_hp" in
+  0|false|no) ;;
   *) pub="--public" ;;
 esac
 

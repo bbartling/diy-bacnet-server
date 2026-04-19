@@ -41,6 +41,7 @@ git clone https://github.com/bbartling/diy-bacnet-server.git
 cd diy-bacnet-server
 printf 'BACNET_RPC_API_KEY=%s\n' "$(openssl rand -hex 32)" > .env
 docker build -t diy-bacnet-server .
+# In-container pytest (e.g. Open-FDD bootstrap --diy-bacnet-tests): add --build-arg BUILD_TESTS=true
 docker run --rm -it --network host --env-file .env --name diy-bacnet-gateway diy-bacnet-server \
   python3 -u -m bacpypes_server.main \
   --name asdf --instance 123456 --address 192.168.204.18/24:47808 --public --debug

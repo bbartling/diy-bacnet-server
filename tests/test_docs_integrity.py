@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_DIR = REPO_ROOT / "docs"
@@ -13,7 +14,12 @@ _MARKDOWN_LINK_RE = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 
 
 def _resolve_internal_md(from_file: Path, link_target: str) -> Path | None:
-    """Return expected *.md path for a sibling or relative doc link; None to skip."""
+    """Return expected *.md path for a sibling or relative doc link; None to skip.
+
+    Assumptions (kept simple on purpose): no image links, no ``.html`` targets,
+    targets are basename or ``basename.md`` paths, and doc bodies do not rely on
+    markdown links inside fenced code blocks in ways this regex would mis-handle.
+    """
     t = link_target.strip().strip('"').strip("'").split("#", 1)[0]
     if not t or t.startswith(("http://", "https://", "mailto:", "{{")):
         return None
@@ -53,7 +59,11 @@ def test_docs_front_matter_has_no_layout_default():
 
 
 def test_docs_config_has_remote_theme_and_baseurl():
-    cfg = (DOCS_DIR / "_config.yml").read_text(encoding="utf-8", errors="replace")
-    assert "remote_theme:" in cfg
-    assert "just-the-docs" in cfg
-    assert "baseurl:" in cfg
+    cfg_text = (DOCS_DIR / "_config.yml").read_text(encoding="utf-8", errors="replace")
+    config = yaml.safe_load(cfg_text)
+    assert isinstance(config, dict), "_config.yml must parse to a YAML mapping"
+    rt = config.get("remote_theme")
+    bu = config.get("baseurl")
+    assert rt, "_config.yml must set a non-empty remote_theme"
+    assert "just-the-docs" in str(rt).lower()
+    assert bu, "_config.yml must set a non-empty baseurl"
