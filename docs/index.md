@@ -1,42 +1,78 @@
 ---
-layout: default
 title: Home
 nav_order: 1
-description: "BACnet/IP + JSON-RPC edge microservice; optional Modbus TCP and MQTT."
+description: "BACnet/IP + JSON-RPC edge gateway; CSV-hosted points, client operations, optional Modbus and MQTT."
 permalink: /
 ---
 
 # DIY BACnet Server
 
-**DIY BACnet Server** is a single-process **BACnet/IP device** plus **JSON-RPC HTTP API** for edge and lab deployments: host a **CSV-defined** point table, push sensor values from agents, act as a **BACnet client** to other controllers on the LAN, and optionally expose **Modbus TCP** reads and **MQTT** (point bridge + JSON-RPC-over-MQTT gateway).
-
-Use it when you want:
-
-- **One UDP socket** for BACnet/IP (`47808`) and **one HTTP port** (`8080`) for automation — no separate “gateway” process unless you choose to split it.
-- **JSON-RPC** as the primary contract for both **hosted points** and **client** operations (Who-Is, read/write, RPM, discovery, schedules).
-- **Docker-first** operation with **`--network host`** so broadcasts and binding behave like a real edge device.
+{: .fs-6 .fw-300 }
+Single-process **BACnet/IP** device and **JSON-RPC** HTTP API for lab and edge: CSV point table, BACnet **client** to field devices, optional **Modbus TCP** and **MQTT**.
 
 ---
 
-## Where to go next
+## Quick start
 
-| I want to… | Read |
-|------------|------|
-| Install, run locally, Docker, first HTTP check | [Getting started](getting-started.html) |
-| Device name, instance, `--address`, BBMD, `--public` | [BACpypes3 CLI](bacpypes3-cli.html) |
-| CSV columns, point types, commandable vs server-owned | [CSV point model](csv-points.html) |
-| JSON-RPC paths, Bearer auth, params wrappers | [JSON-RPC](json-rpc.html) |
-| `server_*` methods (points, schedules) | [Server RPC](server-rpc.html) |
-| `client_*` BACnet operations on external devices | [Client BACnet](client-bacnet.html) |
-| Utility meters / `POST /modbus/read_registers` | [Modbus TCP](modbus-tcp.html) |
-| BACnet2MQTT topics + MQTT RPC gateway | [MQTT](mqtt.html) |
-| All environment variables in one table | [Environment](environment.html) |
-| CI, GitHub Pages, PDF bundle, local tests | [CI & publishing](ci-and-publishing.html) |
+**Repository root** holds one optional gitignored **`.env`** with `BACNET_RPC_API_KEY=…` (Bearer for JSON-RPC and Swagger **Authorize**). Same file for Python and Docker (`--env-file .env`). Do not run `git clone` from inside an existing clone.
+
+### Python (local)
+
+```bash
+git clone https://github.com/bbartling/diy-bacnet-server.git
+cd diy-bacnet-server
+python3 -m venv .venv && . .venv/bin/activate
+pip install -e ".[dev]"
+printf 'BACNET_RPC_API_KEY=%s\n' "$(openssl rand -hex 32)" > .env
+set -a && . ./.env && set +a
+python -m bacpypes_server.main --name asdf --instance 123456 --address 192.168.204.18/24:47808 --public --debug
+```
+
+### Docker
+
+`--network host` uses the host network stack so BACnet/IP (UDP **47808**) matches bare metal. From another PC use **`http://<LAN-IP>:8080`** and allow **TCP 8080** (and UDP 47808) through the host firewall if needed.
+
+```bash
+git clone https://github.com/bbartling/diy-bacnet-server.git
+cd diy-bacnet-server
+printf 'BACNET_RPC_API_KEY=%s\n' "$(openssl rand -hex 32)" > .env
+docker build -t diy-bacnet-server .
+docker run --rm -it --network host --env-file .env --name diy-bacnet-gateway diy-bacnet-server \
+  python3 -u -m bacpypes_server.main \
+  --name asdf --instance 123456 --address 192.168.204.18/24:47808 --public --debug
+```
+
+---
+
+## Endpoints (typical)
+
+| What | URL | Notes |
+|------|-----|--------|
+| **Swagger / OpenAPI** | `http://<host>:8080/docs` | On by default with **`--public`** from `bacpypes_server.main`; override with `BACNET_ENABLE_OPENAPI_DOCS`. |
+| **JSON-RPC** | `POST http://<host>:8080/<method>` | With `BACNET_RPC_API_KEY` set, send `Authorization: Bearer` except exempt paths (see [JSON-RPC](json-rpc)). |
+| **BACnet/IP** | UDP **47808** | Same process as HTTP; use **`--address`** when multi-homed. |
+
+---
+
+## Documentation
+
+| Section | Description |
+|---------|---------------|
+| [Getting started](getting-started) | Clone, venv, `.env`, Docker, verify HTTP, firewall |
+| [BACpypes3 CLI](bacpypes3-cli) | `--name`, `--instance`, `--address`, `--public`, upstream flags |
+| [CSV point model](csv-points) | Root CSV, types, commandable points |
+| [JSON-RPC](json-rpc) | Paths, Bearer, params shapes |
+| [Server RPC](server-rpc) | `server_*` methods |
+| [Client BACnet](client-bacnet) | `client_*` methods |
+| [Modbus TCP](modbus-tcp) | `POST /modbus/read_registers` |
+| [MQTT](mqtt) | BACnet2MQTT, MQTT RPC gateway |
+| [Environment](environment) | Environment variables |
+| [CI & publishing](ci-and-publishing) | Actions, Pages, PDF, tests |
 
 ---
 
 ## Philosophy
 
-**BACnet stays in one process.** The same BACpypes3 `Application` hosts your CSV objects *and* performs client reads/writes on the OT LAN. Agents speak **HTTP + JSON** (and optionally MQTT); BACnet stays on UDP where it belongs.
+**BACnet stays in one process.** The same bacpypes3 `Application` hosts CSV objects and performs client work on the OT LAN. Callers use **HTTP + JSON-RPC** (and optionally MQTT); BACnet stays on UDP.
 
-**Contracts are explicit.** Params shapes differ per method (`request`, `instance`, `update`, or empty) — use OpenAPI at `/openapi.json` when enabled, or the pages above, and always log JSON-RPC `error` payloads on failure.
+For a full building stack (DB, UI, rules engine), see the separate **[open-fdd-afdd-stack](https://github.com/bbartling/open-fdd-afdd-stack)** docs under [`docs/`](https://github.com/bbartling/open-fdd-afdd-stack/tree/main/docs).

@@ -1,4 +1,4 @@
-"""REST routes that mirror Open-FDD proxy body shapes (Who-Is)."""
+"""REST ``POST /bacnet/whois_range`` nested ``{url, request}`` body."""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,7 +9,7 @@ def no_rpc_key(monkeypatch):
     monkeypatch.delenv("BACNET_RPC_API_KEY", raising=False)
 
 
-def test_openapi_bacnet_whois_rest_example_matches_openfdd(no_rpc_key):
+def test_openapi_bacnet_whois_rest_example_nested(no_rpc_key):
     from bacpypes_server.rpc_app import rpc_api
 
     schema = rpc_api.openapi()
@@ -23,7 +23,7 @@ def test_openapi_bacnet_whois_rest_example_matches_openfdd(no_rpc_key):
     assert content.get("example") == want, content
 
 
-def test_post_bacnet_whois_rest_openfdd_body(monkeypatch):
+def test_post_bacnet_whois_nested_body(monkeypatch):
     monkeypatch.delenv("BACNET_RPC_API_KEY", raising=False)
 
     async def fake_who_is(*args, **kwargs):

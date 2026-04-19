@@ -1,5 +1,4 @@
 ---
-layout: default
 title: Modbus TCP
 nav_order: 8
 ---
@@ -35,7 +34,7 @@ Each register operation (`ModbusRegisterOp`):
 
 ## Authentication
 
-When **`BACNET_RPC_API_KEY`** is set, use the same **Bearer** rules as JSON-RPC (see [JSON-RPC](json-rpc.html)), except paths exempted by the auth middleware.
+When **`BACNET_RPC_API_KEY`** is set, use the same **Bearer** rules as JSON-RPC (see [JSON-RPC](json-rpc)), except paths exempted by the auth middleware.
 
 ## Example
 

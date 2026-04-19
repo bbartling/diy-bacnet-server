@@ -87,6 +87,23 @@ async def test_perform_who_is_wrapper_does_not_crash(monkeypatch):
     assert response.data["devices"][0]["instance"] == 1234
 
 
+@pytest.mark.asyncio
+async def test_client_whois_range_empty_who_is_returns_list_not_string(monkeypatch):
+    """Regression: perform_who_is used to return a str on zero I-Ams, which broke JSON-RPC clients."""
+
+    async def fake_perform_who_is(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr(
+        rpc_methods, "perform_who_is", fake_perform_who_is, raising=True
+    )
+
+    req = DeviceInstanceRange(start_instance=1, end_instance=2)
+    response = await rpc_methods.client_whois_range(req)
+    assert response.success is True
+    assert response.data["devices"] == []
+
+
 def test_client_utils_has_expected_public_api():
     """Simple sanity check that key helper functions exist.
 

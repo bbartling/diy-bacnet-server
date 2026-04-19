@@ -24,8 +24,8 @@ def test_device_instance_range_valid():
     assert r.end_instance == 3456799
 
 
-def test_device_instance_range_defaults_match_open_fdd_whois():
-    """Same defaults as open_fdd/platform/api/bacnet.py WhoIsRequestRange."""
+def test_device_instance_range_defaults_whois_scan():
+    """Who-Is range model defaults."""
     r = DeviceInstanceRange()
     assert r.start_instance == 1
     assert r.end_instance == 3456799

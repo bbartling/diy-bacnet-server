@@ -1,18 +1,17 @@
 ---
-layout: default
 title: CI & publishing
 nav_order: 11
 ---
 
 # CI & publishing
 
-Same pattern as **[easy-aso](https://github.com/bbartling/easy-aso)** and **[open-fdd](https://github.com/bbartling/open-fdd)**: GitHub Actions for tests, Jekyll docs on Pages, and a Pandoc + WeasyPrint PDF bundle.
+Same pattern as **[easy-aso](https://github.com/bbartling/easy-aso)**: GitHub Actions for tests, Jekyll docs on Pages, and a Pandoc + WeasyPrint PDF bundle.
 
 ## Workflows
 
 | Workflow | Purpose |
 |----------|---------|
-| `.github/workflows/ci.yml` | **Python 3.14** on `ubuntu-latest`: `pip install ".[dev]"` (see `pyproject.toml`), `python scripts/build_docs_pdf.py --no-pdf`, `pytest tests/`. |
+| `.github/workflows/ci.yml` | **Python 3.12** on `ubuntu-latest`: `pip install ".[dev]"` (see `pyproject.toml`), `python scripts/build_docs_pdf.py --no-pdf`, `pytest tests/`. |
 | `.github/workflows/docs-pages.yml` | `bundle install` + `jekyll build` from `docs/`, deploy with **deploy-pages**. |
 | `.github/workflows/docs-pdf.yml` | Build `pdf/diy-bacnet-server-docs.pdf` and `.txt`; upload artifacts; try to open a PR when outputs change. |
 

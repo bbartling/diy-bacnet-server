@@ -1,8 +1,14 @@
-"""Optional Bearer auth for JSON-RPC HTTP (set BACNET_RPC_API_KEY).
+"""Optional Bearer auth for JSON-RPC HTTP (set ``BACNET_RPC_API_KEY``).
 
-Exempt paths: /server_hello (health / bootstrap verify) and GET / (minimal service info).
-Interactive Swagger/OpenAPI HTTP routes are disabled on the app; schema is still available
-via ``app.openapi()`` for tooling.
+When the key is set, all JSON-RPC ``POST /<method>`` routes require
+``Authorization: Bearer <key>`` except:
+
+- ``GET /`` and ``POST /server_hello`` (minimal reachability checks)
+
+If OpenAPI docs are enabled (see ``bacpypes_server.env_features.openapi_docs_enabled``),
+``/docs``, ``/redoc``, and ``/openapi.json`` (and static assets under them) are also
+exempt so the browser can load Swagger; use **Authorize** in Swagger for Try-it-out
+calls. When docs are off, those routes are not mounted (``GET /docs`` → 404).
 """
 
 from __future__ import annotations
@@ -16,17 +22,15 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
 
+from bacpypes_server.env_features import openapi_docs_enabled
+
 
 def rpc_auth_path_exempt(path: str) -> bool:
     if path == "/server_hello":
         return True
     if path == "/":
         return True
-    if (os.environ.get("OFDD_ENABLE_OPENAPI_DOCS") or "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    ):
+    if openapi_docs_enabled():
         if path in ("/docs", "/redoc", "/openapi.json"):
             return True
         if path.startswith("/docs/") or path.startswith("/redoc/"):
@@ -60,10 +64,11 @@ class BacnetRpcAuthMiddleware(BaseHTTPMiddleware):
 
 def install_openapi_bearer_for_swagger(app) -> None:
     """
-    Inject BearerAuth into the generated OpenAPI schema (for ``app.openapi()`` / tooling).
-    HTTP /docs and /openapi.json are disabled on the running app; middleware enforces the key
-    when BACNET_RPC_API_KEY is set.
+    Inject BearerAuth into the generated OpenAPI schema (for ``app.openapi()`` / Swagger).
+    When ``BACNET_RPC_API_KEY`` is set, middleware enforces Bearer on JSON-RPC routes; OpenAPI
+    UI paths are exempt only when docs are enabled (see ``rpc_auth_path_exempt``).
     """
+
     def _custom_openapi():
         if app.openapi_schema:
             return app.openapi_schema
@@ -85,8 +90,7 @@ def install_openapi_bearer_for_swagger(app) -> None:
                 "scheme": "bearer",
                 "bearerFormat": "API Key",
                 "description": (
-                    "When BACNET_RPC_API_KEY is set, use that value "
-                    "(Open-FDD: same as `OFDD_BACNET_SERVER_API_KEY` in stack/.env). "
+                    "When BACNET_RPC_API_KEY is set, use that same value. "
                     "Send `Authorization: Bearer <key>` on JSON-RPC requests."
                 ),
             }

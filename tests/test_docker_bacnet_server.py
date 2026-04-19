@@ -14,7 +14,7 @@ def get_compose_command():
     Return a command prefix for docker compose, or None if neither V2 nor V1 is usable.
 
     Uses shutil.which so we never return a bare 'docker-compose' name that is not on PATH
-    (e.g. inside openfdd_bacnet_server, where there is no Docker CLI at all).
+    (e.g. inside a minimal gateway container where there is no Docker CLI at all).
     """
     docker = shutil.which("docker")
     if docker:

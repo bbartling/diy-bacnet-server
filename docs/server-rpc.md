@@ -1,12 +1,11 @@
 ---
-layout: default
 title: Server RPC
 nav_order: 6
 ---
 
 # Server RPC (hosted points)
 
-Hosted BACnet objects are created from the **single root CSV** (see [CSV point model](csv-points.html)). CSV `Name` values map to entries in `point_map`.
+Hosted BACnet objects are created from the **single root CSV** (see [CSV point model](csv-points)). CSV `Name` values map to entries in `point_map`.
 
 ## `server_hello`
 

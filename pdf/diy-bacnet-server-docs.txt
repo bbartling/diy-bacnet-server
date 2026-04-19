@@ -87,7 +87,7 @@ If the image sets `WORKDIR` / `PYTHONPATH` for `/app`, keep the same `python3 -m
 ## Verify HTTP
 
 - **Health:** `POST /server_hello` with a JSON-RPC body (see [JSON-RPC](json-rpc.html)).
-- **OpenAPI / Swagger:** when `OFDD_ENABLE_OPENAPI_DOCS` is enabled, open `http://<host>:8080/docs` and `/openapi.json`.
+- **OpenAPI / Swagger:** with **`--public`** from `bacpypes_server.main`, `/docs` is on; without it, HTTP and docs stay on loopback only.
 
 ## CSV file location
 
@@ -208,7 +208,7 @@ When **`BACNET_RPC_API_KEY`** is set:
 
 - Send **`Authorization: Bearer <key>`** on protected routes.
 - **Exempt** without Bearer: `GET /`, `POST /server_hello`.
-- If **`OFDD_ENABLE_OPENAPI_DOCS`** is `1`/`true`/`yes`, these are also exempt so the UI can load: `/docs`, `/redoc`, `/openapi.json` (and static paths under them).
+- When **`/docs`** is enabled (same as **`--public`** when using `bacpypes_server.main`, unless configured otherwise), these are also exempt so the UI can load: `/docs`, `/redoc`, `/openapi.json` (and static paths under them).
 
 When the key is **unset** or **empty**, Bearer auth is not enforced.
 
@@ -298,7 +298,7 @@ The same BACnet **`Application`** that hosts your CSV objects acts as a **client
 
 ## `client_whois_range`
 
-- **Params:** `{ "request": { "start_instance": 1, "end_instance": 3456799 } }` (defaults match Open-FDD style scans.)
+- **Params:** `{ "request": { "start_instance": 1, "end_instance": 3456799 } }` (defaults suit typical discovery scans.)
 - **Returns:** `BaseResponse` with `data.devices`.
 
 ## `client_read_property`
@@ -446,7 +446,7 @@ See the **[easy-aso examples README](https://github.com/bbartling/easy-aso/blob/
 | Variable | Purpose |
 |----------|---------|
 | `BACNET_RPC_API_KEY` | If set, require `Authorization: Bearer` on protected HTTP routes. |
-| `OFDD_ENABLE_OPENAPI_DOCS` | If set, expose `/docs`, `/redoc`, `/openapi.json` and exempt them from Bearer in the auth middleware. |
+| `BACNET_ENABLE_OPENAPI_DOCS` | If set, expose `/docs`, `/redoc`, `/openapi.json` and exempt them from Bearer in the auth middleware. When unset, `python -m bacpypes_server.main` sets this from **`--public`**. |
 | `BACNET2MQTT_ENABLED` | Enable BACnet2MQTT bridge. |
 | `MQTT_BROKER_URL` | Broker URL for the bridge (and MQTT RPC gateway fallback). |
 | `MQTT_BASE_TOPIC` | Bridge topic prefix. |
@@ -463,13 +463,13 @@ See the **[easy-aso examples README](https://github.com/bbartling/easy-aso/blob/
 
 # CI & publishing
 
-Same pattern as **[easy-aso](https://github.com/bbartling/easy-aso)** and **[open-fdd](https://github.com/bbartling/open-fdd)**: GitHub Actions for tests, Jekyll docs on Pages, and a Pandoc + WeasyPrint PDF bundle.
+Same pattern as **[easy-aso](https://github.com/bbartling/easy-aso)**: GitHub Actions for tests, Jekyll docs on Pages, and a Pandoc + WeasyPrint PDF bundle.
 
 ## Workflows
 
 | Workflow | Purpose |
 |----------|---------|
-| `.github/workflows/ci.yml` | **Python 3.14** on `ubuntu-latest`: `pip install ".[dev]"` (see `pyproject.toml`), `python scripts/build_docs_pdf.py --no-pdf`, `pytest tests/`. |
+| `.github/workflows/ci.yml` | **Python 3.12** on `ubuntu-latest`: `pip install ".[dev]"` (see `pyproject.toml`), `python scripts/build_docs_pdf.py --no-pdf`, `pytest tests/`. |
 | `.github/workflows/docs-pages.yml` | `bundle install` + `jekyll build` from `docs/`, deploy with **deploy-pages**. |
 | `.github/workflows/docs-pdf.yml` | Build `pdf/diy-bacnet-server-docs.pdf` and `.txt`; upload artifacts; try to open a PR when outputs change. |
 

@@ -88,7 +88,9 @@ def parse_object_identifier(oid_str: str) -> ObjectIdentifier:
 
 @rpc.method()
 def server_hello() -> dict:
-    return {"message": "BACnet RPC API ready. Interactive docs are disabled; use Open-FDD BACnet tools or JSON-RPC."}
+    return {
+        "message": "BACnet RPC API ready. See GET / for deployment info; use JSON-RPC or REST routes as documented."
+    }
 
 
 # ──────── BACNET SERVER UTILS METHODS ────────

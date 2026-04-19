@@ -2,8 +2,12 @@
 import asyncio
 import logging
 import argparse
+import os
 
-from bacpypes_server.rpc_app import rpc_api
+from bacpypes_server.env_features import (
+    apply_openapi_docs_default_from_public,
+    openapi_docs_enabled,
+)
 from bacpypes_server.server_utils import load_csv_and_create_objects, point_map, commandable_point_names
 from bacpypes_server.client_utils import set_app
 from bacpypes_server.mqtt_bridge import get_bridge_config, run_mqtt_bridge
@@ -44,6 +48,7 @@ class CustomArgumentParser(SimpleArgumentParser):
 
 async def main():
     args = CustomArgumentParser().parse_args()
+    apply_openapi_docs_default_from_public(bool(args.public))
 
     try:
         bacnet_app = Application.from_args(args)
@@ -53,6 +58,9 @@ async def main():
     except Exception as e:
         logger.error(f"Startup error: {e}")
         return
+
+    # Import after BACnet init succeeds; env default above makes /docs track --public unless overridden.
+    from bacpypes_server.rpc_app import rpc_api
 
     # Choose host based on --public
     host = "0.0.0.0" if args.public else "127.0.0.1"
@@ -87,7 +95,15 @@ async def main():
     config = uvicorn.Config(app=rpc_api, host=host, port=8080, log_level="debug")
     server = uvicorn.Server(config)
 
-    logger.info(f"JSON-RPC API ready at http://{host}:8080 (docs disabled; use Open-FDD or JSON-RPC)")
+    _docs_on = openapi_docs_enabled()
+    if _docs_on:
+        logger.info(
+            f"JSON-RPC API ready at http://{host}:8080 (Swagger/OpenAPI at /docs)"
+        )
+    else:
+        logger.info(
+            f"JSON-RPC API ready at http://{host}:8080 (/docs off — use --public for Swagger on the LAN)"
+        )
     try:
         await server.serve()
     finally:

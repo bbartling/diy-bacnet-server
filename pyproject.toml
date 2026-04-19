@@ -7,7 +7,7 @@ name = "diy-bacnet-server"
 version = "0.1.0"
 description = "BACnet/IP + JSON-RPC edge microservice for Docker-based deployments; optional Modbus TCP and MQTT."
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["bacnet", "bacpypes3", "json-rpc", "fastapi", "iot", "hvac"]
@@ -16,6 +16,8 @@ classifiers = [
   "Intended Audience :: Developers",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
   "Topic :: System :: Networking",
 ]
@@ -32,7 +34,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["black", "pytest", "pytest-asyncio"]
-# Minimal deps for `python3 -m pytest tests/` inside the published Docker image (e.g. Open-FDD bootstrap --diy-bacnet-tests).
+# Minimal deps for `python3 -m pytest tests/` inside the published Docker image.
 test = ["pytest", "pytest-asyncio"]
 
 [project.urls]

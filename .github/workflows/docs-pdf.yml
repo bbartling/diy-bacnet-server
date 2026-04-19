@@ -1,5 +1,5 @@
 # Regenerate pdf/diy-bacnet-server-docs.pdf (+ .txt) when docs or the builder change.
-# Opens a PR when artifacts change (same pattern as open-fdd / easy-aso).
+# Opens a PR when artifacts change (same pattern as easy-aso).
 
 name: Docs PDF
 
@@ -34,7 +34,7 @@ jobs:
 
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.14"
+          python-version: "3.12"
           cache: pip
 
       - name: Install pandoc and WeasyPrint system libraries

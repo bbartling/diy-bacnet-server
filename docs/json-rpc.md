@@ -1,5 +1,4 @@
 ---
-layout: default
 title: JSON-RPC
 nav_order: 5
 ---
@@ -31,7 +30,7 @@ When **`BACNET_RPC_API_KEY`** is set:
 
 - Send **`Authorization: Bearer <key>`** on protected routes.
 - **Exempt** without Bearer: `GET /`, `POST /server_hello`.
-- If **`OFDD_ENABLE_OPENAPI_DOCS`** is `1`/`true`/`yes`, these are also exempt so the UI can load: `/docs`, `/redoc`, `/openapi.json` (and static paths under them).
+- When **`/docs`** is enabled (same as **`--public`** when using `bacpypes_server.main`, unless configured otherwise), these are also exempt so the UI can load: `/docs`, `/redoc`, `/openapi.json` (and static paths under them).
 
 When the key is **unset** or **empty**, Bearer auth is not enforced.
 
@@ -52,4 +51,4 @@ When the key is **unset** or **empty**, Bearer auth is not enforced.
 
 ## Modbus is not JSON-RPC
 
-**`POST /modbus/read_registers`** is a normal FastAPI route, not the JSON-RPC router. See [Modbus TCP](modbus-tcp.html).
+**`POST /modbus/read_registers`** is a normal FastAPI route, not the JSON-RPC router. See [Modbus TCP](modbus-tcp).

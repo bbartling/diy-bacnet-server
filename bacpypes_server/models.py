@@ -91,7 +91,7 @@ def _device_instance_range_json_schema(schema: dict) -> None:
 
 
 class DeviceInstanceRange(BaseModel):
-    """Who-Is instance range; defaults match Open-FDD POST /bacnet/whois_range (WhoIsRequestRange)."""
+    """Who-Is instance range (defaults suit typical discovery scans)."""
 
     model_config = ConfigDict(json_schema_extra=_device_instance_range_json_schema)
 
