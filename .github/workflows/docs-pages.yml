@@ -6,7 +6,7 @@ name: Docs (GitHub Pages)
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [master]
     paths:
       - "docs/**"
       - ".github/workflows/docs-pages.yml"
@@ -44,8 +44,7 @@ jobs:
           path: _site
 
   deploy:
-    # Repo environment policy currently allows deployments only from `develop`.
-    if: github.ref == 'refs/heads/develop'
+    if: github.ref == 'refs/heads/master'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

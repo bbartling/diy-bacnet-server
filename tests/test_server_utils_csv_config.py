@@ -1,7 +1,5 @@
 """Tests for CSV-configured object Instance and CovIncrement behavior."""
 
-from pathlib import Path
-
 import pytest
 
 from bacpypes_server import server_utils
@@ -94,3 +92,28 @@ async def test_loader_duplicate_instance_skips_conflicting_row(tmp_path, monkeyp
 
     assert "av-1" in server_utils.point_map
     assert "av-duplicate" not in server_utils.point_map
+
+
+@pytest.mark.asyncio
+async def test_loader_mixed_explicit_and_auto_instance_uses_next_available(tmp_path, monkeypatch):
+    csv_path = tmp_path / "points.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "Name,PointType,Units,Commandable,Default,Instance,CovIncrement",
+                "sat,AV,degreesFahrenheit,N,70.0,1,0.5",
+                "rat,AV,degreesFahrenheit,N,71.0,,0.5",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(server_utils, "CSV_FILE", str(csv_path))
+
+    app = _DummyApp()
+    await server_utils.load_csv_and_create_objects(app)
+
+    sat = server_utils.point_map["sat"]
+    rat = server_utils.point_map["rat"]
+    assert int(tuple(sat.objectIdentifier)[1]) == 1
+    assert int(tuple(rat.objectIdentifier)[1]) == 2

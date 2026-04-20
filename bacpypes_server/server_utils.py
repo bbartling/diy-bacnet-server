@@ -148,15 +148,24 @@ async def load_csv_and_create_objects(app):
                 if instance_str:
                     try:
                         instance_num = int(instance_str)
-                    except ValueError:
+                    except ValueError as err:
                         raise ValueError(
                             f"row {idx} ({name}): Instance must be an integer, got {instance_str!r}"
-                        )
+                        ) from err
                     if not 0 <= instance_num <= 4194303:
                         raise ValueError(
                             f"row {idx} ({name}): Instance out of BACnet range 0..4194303, got {instance_num}"
                         )
                 else:
+                    while (
+                        instance_ids[obj_kind] <= 4194303
+                        and (obj_kind, instance_ids[obj_kind]) in used_instances
+                    ):
+                        instance_ids[obj_kind] += 1
+                    if instance_ids[obj_kind] > 4194303:
+                        raise ValueError(
+                            f"row {idx} ({name}): no available auto-assigned instances left for {obj_kind}"
+                        )
                     instance_num = instance_ids[obj_kind]
                     instance_ids[obj_kind] += 1
 
@@ -168,16 +177,25 @@ async def load_csv_and_create_objects(app):
                 used_instances.add(key)
 
                 cov_increment = 1.0
+                analog_types = {"AI", "AO", "AV"}
                 if cov_increment_str:
-                    try:
-                        cov_increment = float(cov_increment_str)
-                    except ValueError:
-                        raise ValueError(
-                            f"row {idx} ({name}): CovIncrement must be numeric, got {cov_increment_str!r}"
-                        )
-                    if cov_increment <= 0:
-                        raise ValueError(
-                            f"row {idx} ({name}): CovIncrement must be > 0, got {cov_increment}"
+                    if point_type in analog_types:
+                        try:
+                            cov_increment = float(cov_increment_str)
+                        except ValueError as err:
+                            raise ValueError(
+                                f"row {idx} ({name}): CovIncrement must be numeric, got {cov_increment_str!r}"
+                            ) from err
+                        if cov_increment <= 0:
+                            raise ValueError(
+                                f"row {idx} ({name}): CovIncrement must be > 0, got {cov_increment}"
+                            )
+                    else:
+                        logger.warning(
+                            "row %s (%s): CovIncrement is ignored for PointType=%s",
+                            idx,
+                            name,
+                            point_type,
                         )
 
                 engineering_unit = resolve_unit(unit_str)
