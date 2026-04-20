@@ -1,6 +1,6 @@
 # Build Jekyll site from docs/ and deploy to GitHub Pages (project site: /diy-bacnet-server).
 # First-time setup: repo Settings → Pages → Build and deployment → Source: **GitHub Actions**.
-# Same pattern as open-fdd / easy-aso.
+# Same pattern as easy-aso.
 
 name: Docs (GitHub Pages)
 

@@ -1,5 +1,4 @@
 ---
-layout: default
 title: BACpypes3 CLI
 nav_order: 3
 ---
@@ -36,7 +35,7 @@ python -c "from bacpypes3.argparse import SimpleArgumentParser; SimpleArgumentPa
 
 | Option | Purpose |
 |--------|---------|
-| `--public` | Bind the **HTTP** server to `0.0.0.0` instead of `127.0.0.1`. Does not change BACnet UDP unless you also set `--address` appropriately. |
+| `--public` | Bind **HTTP** to `0.0.0.0` instead of `127.0.0.1`. By default also enables **`/docs`** when `BACNET_ENABLE_OPENAPI_DOCS` is unset (see [Environment](environment)). BACnet UDP still follows **`--address`**. |
 
 ## Recommended examples
 

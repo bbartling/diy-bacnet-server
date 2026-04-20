@@ -4,39 +4,54 @@
 [![CI](https://github.com/bbartling/diy-bacnet-server/actions/workflows/ci.yml/badge.svg)](https://github.com/bbartling/diy-bacnet-server/actions/workflows/ci.yml)
 ![MIT License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Development Status](https://img.shields.io/badge/status-Beta-blue.svg)
-![Python](https://img.shields.io/badge/Python-3.14-blue?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.12%2B-blue?logo=python&logoColor=white)
 
 Lightweight BACnet/IP + JSON-RPC edge microservice for Docker-based deployments, including optional Modbus TCP client features.
 
-## Quick Start
+## Quick start
+
+Same flags as the bacpypes3 module: `--name`, `--instance`, optional `--address`, and `--public` for LAN HTTP and `/docs`. Drop `--address` when a single NIC is enough.
+
+For **Python (local)** and **Docker**, use the same **`.env` in the repository root** (next to `Dockerfile` / `pyproject.toml`): one `BACNET_RPC_API_KEY=…` line. Local runs load it with `set -a && . ./.env`; Docker passes it with `--env-file .env` from that same directory.
+
+### Python (local)
+
+Create a gitignored `.env` with one line, `BACNET_RPC_API_KEY=…`. The server expects that value on `Authorization: Bearer`; in Swagger use Authorize and paste the same secret.
+
+If you are **already** in a clone of this repo, do **not** run `git clone` again (that nests a second copy inside the first). Only use `git clone` / `cd` on a fresh machine.
 
 ```bash
 git clone https://github.com/bbartling/diy-bacnet-server.git
 cd diy-bacnet-server
-docker build -t diy-bacnet-server .
-docker run --rm -it --network host --name bens-bacnet diy-bacnet-server \
-  python3 -m bacpypes_server.main --name BensServer --instance 123456 --debug --public
+python3 -m venv .venv && . .venv/bin/activate
+pip install -e ".[dev]"
+printf 'BACNET_RPC_API_KEY=%s\n' "$(openssl rand -hex 32)" > .env
+set -a && . ./.env && set +a
+python -m bacpypes_server.main --name asdf --instance 123456 --address 192.168.204.18/24:47808 --public --debug
 ```
 
-- BACnet/IP: UDP `47808`
-- JSON-RPC API: HTTP `8080`
-- Swagger/OpenAPI: `/docs` and `/openapi.json` (when enabled by env)
+With `--public`, open `http://127.0.0.1:8080/docs` (or this host’s LAN IP from another machine). `POST /server_hello` stays unauthenticated; other JSON-RPC routes need Bearer when a key is set. Who-Is and discovery match bacpypes3 once UDP 47808 is allowed through the host firewall. Skip `.env` only for unsecured loopback tests.
 
-## Local development
+### Docker
+
+`--network host` is a Docker option: the container shares the host’s network stack instead of a private bridge/NAT network. That keeps BACnet/IP (UDP broadcasts and port 47808) behaving like running Python directly on the machine. Swagger **Authorize** still uses the same `BACNET_RPC_API_KEY` value you put in `.env`. Skip `git clone` / `cd` if you already have the repo.
 
 ```bash
-pip install -e ".[dev]"
-python -m bacpypes_server.main --name Lab --instance 999 --debug
+git clone https://github.com/bbartling/diy-bacnet-server.git
+cd diy-bacnet-server
+printf 'BACNET_RPC_API_KEY=%s\n' "$(openssl rand -hex 32)" > .env
+docker build -t diy-bacnet-server .
+# In-container pytest (e.g. Open-FDD bootstrap --diy-bacnet-tests): add --build-arg BUILD_TESTS=true
+docker run --rm -it --network host --env-file .env --name diy-bacnet-gateway diy-bacnet-server \
+  python3 -u -m bacpypes_server.main \
+  --name asdf --instance 123456 --address 192.168.204.18/24:47808 --public --debug
 ```
 
-Dependencies and optional dev tools (`pytest`, `black`, …) live in **`pyproject.toml`** (PEP 621), not `requirements.txt`.
+Swagger **Authorize** uses the same `BACNET_RPC_API_KEY` value as in that file.
 
-The Docker image installs the **`test`** extra (`pytest`, `pytest-asyncio`) so sibling stacks such as **open-fdd-afdd-stack** can run `scripts/bootstrap.sh --diy-bacnet-tests` (`docker exec … pytest` in the gateway container).
+## Online documentation
 
-## Documentation
-
-- **Published site:** [bbartling.github.io/diy-bacnet-server](https://bbartling.github.io/diy-bacnet-server/)
-- **Source (Just the Docs):** start at [`docs/index.md`](docs/index.md); topic pages live alongside it under `docs/*.md` (same multi-page style as [easy-aso](https://github.com/bbartling/easy-aso/tree/master/docs)).
+- [bbartling.github.io/diy-bacnet-server](https://bbartling.github.io/diy-bacnet-server/)
 
 ## License
 

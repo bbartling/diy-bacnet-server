@@ -420,6 +420,7 @@ async def bacnet_rpm_chunked(
                 len(chunk),
                 e,
                 address,
+                exc_info=True,
             )
             for _ in chunk:
                 combined.append({"error": str(e)})
@@ -432,7 +433,10 @@ async def perform_who_is(start_instance: int, end_instance: int):
     if not i_ams:
         no_response_str = f"No response(s) on WhoIs start_instance {start_instance} end_instance {end_instance}"
         logger.error(no_response_str)
-        return no_response_str
+        # Historically this returned a plain string, which JSON-RPC then placed in
+        # `data.devices` and caused clients to treat a string like an array (length
+        # looked like a device count, `.map` crashed). Empty list = "no devices".
+        return []
 
     result = []
     for i_am in i_ams:

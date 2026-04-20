@@ -1,5 +1,10 @@
-# rest_openfdd_aliases.py — REST routes whose bodies match Open-FDD proxy Swagger (optional parity).
-# JSON-RPC paths (e.g. POST /client_whois_range) are unchanged; this is for humans comparing UIs.
+"""Optional REST ``POST /bacnet/whois_range`` with nested ``{url, request}`` JSON.
+
+Some multi-gateway UIs send a ``url`` field alongside ``request``; on this
+single-gateway service ``url`` is ignored. JSON-RPC (``POST /client_whois_range``)
+is unchanged.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -12,11 +17,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from bacpypes_server.models import BaseResponse, DeviceInstanceRange
 from bacpypes_server import rpc_methods
 
-logger = logging.getLogger("rest_openfdd_aliases")
+logger = logging.getLogger("rest_whois_nested")
 
 
-def _openfdd_whois_body_json_schema_extra(schema: dict) -> None:
-    """url before request; start_instance before end_instance inside example.request."""
+def _whois_nested_body_json_schema_extra(schema: dict) -> None:
+    """Order ``url`` before ``request`` in generated schema; stable example."""
     props = schema.get("properties") or {}
     if "url" in props and "request" in props:
         schema["properties"] = {"url": props["url"], "request": props["request"]}
@@ -26,14 +31,14 @@ def _openfdd_whois_body_json_schema_extra(schema: dict) -> None:
     }
 
 
-class OpenFddWhoIsBody(BaseModel):
-    """Same JSON shape as Open-FDD ``POST /bacnet/whois_range``. ``url`` is ignored here (single gateway)."""
+class WhoIsRangeNestedBody(BaseModel):
+    """Body shape ``{url?, request}`` for UIs that include a gateway ``url`` field."""
 
-    model_config = ConfigDict(json_schema_extra=_openfdd_whois_body_json_schema_extra)
+    model_config = ConfigDict(json_schema_extra=_whois_nested_body_json_schema_extra)
 
     url: Optional[str] = Field(
         default=None,
-        description="Ignored on this gateway; Open-FDD uses this to pick a remote gateway URL.",
+        description="Ignored on this gateway (single BACnet/IP attachment).",
     )
     request: DeviceInstanceRange = Field(
         default_factory=DeviceInstanceRange,
@@ -41,14 +46,8 @@ class OpenFddWhoIsBody(BaseModel):
     )
 
 
-_OPENFDD_WHOIS_EXAMPLE = {
-    "url": None,
-    "request": {"start_instance": 1, "end_instance": 3456799},
-}
-
-
 def install_openapi_whois_rest_example_patch(app) -> None:
-    """Force REST Who-Is example to match Open-FDD (FastAPI drops null keys from examples)."""
+    """Ensure OpenAPI example keeps ``url: null`` (some generators drop null keys)."""
     _prev = app.openapi
 
     def _combined_openapi():
@@ -70,19 +69,19 @@ def install_openapi_whois_rest_example_patch(app) -> None:
     app.openapi = _combined_openapi
 
 
-def register_openfdd_rest_aliases(app) -> None:
+def register_whois_nested_rest_routes(app) -> None:
     @app.post(
         "/bacnet/whois_range",
         tags=["BACnet"],
-        summary="Who-Is range (Open-FDD-compatible body)",
+        summary="Who-Is range (nested url + request)",
         description=(
-            "Same request JSON as **Open-FDD** `POST /bacnet/whois_range`: `{ \"url\", \"request\" }`. "
-            "The `url` field is ignored on diy-bacnet-server. "
-            "For machine clients you can still use JSON-RPC `POST /client_whois_range`."
+            'JSON body `{"url": null, "request": {"start_instance": 1, "end_instance": N}}` '
+            "— `url` is ignored on this gateway. Prefer JSON-RPC `POST /client_whois_range` "
+            "for automation."
         ),
         response_model=BaseResponse,
     )
-    async def bacnet_whois_range_openfdd_shape(body: OpenFddWhoIsBody) -> BaseResponse:
+    async def bacnet_whois_range_nested(body: WhoIsRangeNestedBody) -> BaseResponse:
         if body.url not in (None, ""):
             logger.debug("Ignoring url=%r on standalone gateway Who-Is", body.url)
         try:

@@ -1,5 +1,4 @@
 ---
-layout: default
 title: MQTT
 nav_order: 9
 ---

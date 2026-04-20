@@ -47,7 +47,6 @@ agents/*/agent.log
 agents_data/
 
 Caddyfile
-.env
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

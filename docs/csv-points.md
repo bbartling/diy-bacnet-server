@@ -1,5 +1,4 @@
 ---
-layout: default
 title: CSV point model
 nav_order: 4
 ---
@@ -26,6 +25,6 @@ Columns:
 
 ## Schedule rows
 
-`Schedule` creates a BACnet **`ScheduleObject`** with a default weekly pattern from the loader. Read/update the structured schedule over **`server_read_schedule`** / **`server_update_schedule`** (see [Server RPC](server-rpc.html)).
+`Schedule` creates a BACnet **`ScheduleObject`** with a default weekly pattern from the loader. Read/update the structured schedule over **`server_read_schedule`** / **`server_update_schedule`** (see [Server RPC](server-rpc)).
 
 **Note:** BACpypes3’s local schedule interpreter may have timing quirks in some versions; validate schedule behaviour on a lab controller for production calendars.

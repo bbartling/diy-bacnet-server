@@ -1,6 +1,5 @@
-# Jekyll site (GitHub Pages) — same stack as open-fdd / easy-aso: Just the Docs remote theme
 title: "DIY BACnet Server"
-description: "BACnet/IP + JSON-RPC edge microservice for Docker-based deployments; optional Modbus TCP and MQTT."
+description: "BACnet/IP + JSON-RPC edge gateway — bacpypes3, Docker, optional Modbus TCP and MQTT."
 baseurl: "/diy-bacnet-server"
 url: "https://bbartling.github.io"
 
@@ -14,8 +13,9 @@ plugins:
 
 aux_links:
   "GitHub": "https://github.com/bbartling/diy-bacnet-server"
+  "Published docs": "https://bbartling.github.io/diy-bacnet-server/"
 
-footer_content: "MIT · diy-bacnet-server · BACnet/IP + JSON-RPC gateway"
+footer_content: "MIT · <a href=\"https://github.com/bbartling/diy-bacnet-server\">diy-bacnet-server</a> · <a href=\"https://bbartling.github.io/diy-bacnet-server/\">GitHub Pages</a>"
 
 heading_anchors: true
 

@@ -1,5 +1,4 @@
 ---
-layout: default
 title: Client BACnet
 nav_order: 7
 ---
@@ -23,7 +22,7 @@ The same BACnet **`Application`** that hosts your CSV objects acts as a **client
 
 ## `client_whois_range`
 
-- **Params:** `{ "request": { "start_instance": 1, "end_instance": 3456799 } }` (defaults match Open-FDD style scans.)
+- **Params:** `{ "request": { "start_instance": 1, "end_instance": 3456799 } }` (defaults suit typical discovery scans.)
 - **Returns:** `BaseResponse` with `data.devices`.
 
 ## `client_read_property`

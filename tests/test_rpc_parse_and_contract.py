@@ -9,7 +9,7 @@ from bacpypes_server.rpc_methods import parse_object_identifier
 
 
 def _rpc_auth_headers() -> dict:
-    """Match production: when BACNET_RPC_API_KEY is set (e.g. Open-FDD stack), RPC needs Bearer."""
+    """When BACNET_RPC_API_KEY is set, RPC routes require Bearer."""
     k = (os.environ.get("BACNET_RPC_API_KEY") or "").strip()
     return {"Authorization": f"Bearer {k}"} if k else {}
 
