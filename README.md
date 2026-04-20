@@ -11,39 +11,11 @@ Lightweight BACnet/IP + JSON-RPC edge microservice for Docker-based deployments,
 
 ## Quick Start
 
-This is a mini tutorial for bacpypes3 which is super useful for troubleshooting purpoeses. See further below for setup with the full-featured DIY BACnet server, which includes a web app powered by FastAPI and supports easy Docker deployments.
+This app uses bacpypes3 CLI-style arguments to configure a BACnet server (`--name`, `--instance`, `--address`), similar to running commands directly in the bacpypes3 shell.
 
+### BACnet Shell Reference
 
----
-
-## Quick Test (Raw bacpypes3)
-
-Set up a minimal Python environment and run a basic bacpypes3 instance:
-
-```bash
-# Create virtual environment
-python -m venv env
-
-# Activate (Linux / macOS)
-. env/bin/activate
-
-# Install dependencies
-pip install bacpypes3 ifaddr
-```
-
-### Run bacpypes3 Test Instance
-
-```bash
-python -m bacpypes3 \
-  --name BensRawBacpypes3Test \
-  --address 192.168.204.12/24 \
-  --instance 123456 \
-  --debug
-```
-
-This will start a basic BACnet device on your network for testing discovery (`whois`) and communication.
-
-
+When running the bacpypes3 module interactively:
 ```bash
 > help
 commands: config, exit, help, iam, ihave, irt, rbdt, read, rfdt, rpm, wbdt, whohas, whois, wirtn, write
