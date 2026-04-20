@@ -58,7 +58,7 @@ docker run --rm -it --network host --env-file .env --name diy-bacnet-gateway diy
 
 | Section | Description |
 |---------|---------------|
-| [Getting started](getting-started) | Clone, venv, `.env`, Docker, verify HTTP, firewall |
+| [Getting started](getting-started) | Clone, venv, `.env`, Docker, verify HTTP, firewall, and raw bacpypes3 troubleshooting |
 | [BACpypes3 CLI](bacpypes3-cli) | `--name`, `--instance`, `--address`, `--public`, upstream flags |
 | [CSV point model](csv-points) | Root CSV, types, commandable points |
 | [JSON-RPC](json-rpc) | Paths, Bearer, params shapes |

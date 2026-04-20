@@ -92,3 +92,69 @@ From another machine on the LAN, use **`http://<server-LAN-IP>:8080/docs`**, not
 ## CSV location
 
 Exactly **one** `*.csv` in the **repository root** (e.g. `hvac_server_points.csv`). See [CSV point model](csv-points).
+
+---
+
+## Quick test (raw bacpypes3 troubleshooting)
+
+Use this mini bacpypes3-only console test when you want to isolate BACnet/IP behavior from the full FastAPI gateway.
+
+```bash
+# Create virtual environment
+python -m venv env
+
+# Activate (Linux / macOS)
+. env/bin/activate
+
+# Install dependencies
+pip install bacpypes3 ifaddr
+```
+
+Run a minimal bacpypes3 instance:
+
+```bash
+python -m bacpypes3 \
+  --name BensRawBacpypes3Test \
+  --address 192.168.204.12/24 \
+  --instance 123456 \
+  --debug
+```
+
+You can then use the interactive commands:
+
+```text
+> help
+commands: config, exit, help, iam, ihave, irt, rbdt, read, rfdt, rpm, wbdt, whohas, whois, wirtn, write
+```
+
+```text
+> whois
+```
+
+Example output (trimmed):
+
+```text
+3456788 192.168.204.16
+3456789 192.168.204.13
+3456790 192.168.204.14
+```
+
+Common commands:
+
+```bash
+# Discover devices in a range
+whois 1000 3456799
+
+# Read a point
+read 192.168.204.13 analog-input,1 present-value
+
+# Write a value (priority 9)
+write 192.168.204.14 analog-output,1 present-value 999.8 9
+
+# Release a command (null write)
+write 192.168.204.14 analog-output,1 present-value null 9
+```
+
+### Important host-level warning
+
+Only one BACnet service should bind on the same host/port at a time. Before starting this raw bacpypes3 console, stop other BACnet apps on the OS that may already be bound (for example the DIY BACnet server process/container).
