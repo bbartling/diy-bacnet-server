@@ -36,7 +36,7 @@ Generated files:
 - `pdf/diy-bacnet-server-docs.pdf`
 - `pdf/diy-bacnet-server-docs.txt`
 
-The `pdf/` directory is tracked with **`pdf/.gitkeep`** until CI commits the first bundle.
+The `pdf/` directory is tracked with **`pdf/.gitkeep`** so the directory exists in the repository even though the Docs PDF workflow publishes artifacts only (no auto-commit, branch, or PR creation).
 
 Local combined text (no Pandoc):
 

@@ -32,7 +32,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["black", "pytest", "pytest-asyncio", "pyyaml"]
+dev = ["pytest", "pytest-asyncio", "pyyaml"]
 # Minimal deps for `python3 -m pytest tests/` inside the published Docker image.
 test = ["pytest", "pytest-asyncio"]
 
