@@ -31,6 +31,7 @@ When **`BACNET_RPC_API_KEY`** is set:
 - Send **`Authorization: Bearer <key>`** on protected routes.
 - **Exempt** without Bearer: `GET /`, `POST /server_hello`.
 - When **`/docs`** is enabled (same as **`--public`** when using `bacpypes_server.main`, unless configured otherwise), these are also exempt so the UI can load: `/docs`, `/redoc`, `/openapi.json` (and static paths under them).
+- If another application or gateway proxy calls this server, it should forward the same Bearer value on protected routes.
 
 When the key is **unset** or **empty**, Bearer auth is not enforced.
 

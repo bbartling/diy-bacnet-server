@@ -8,29 +8,164 @@
 
 Lightweight BACnet/IP + JSON-RPC edge microservice for Docker-based deployments, including optional Modbus TCP client features.
 
-## Quick start
 
-Same flags as the bacpypes3 module: `--name`, `--instance`, optional `--address`, and `--public` for LAN HTTP and `/docs`. Drop `--address` when a single NIC is enough.
+## Quick Start
 
-For **Python (local)** and **Docker**, use the same **`.env` in the repository root** (next to `Dockerfile` / `pyproject.toml`): one `BACNET_RPC_API_KEY=…` line. Local runs load it with `set -a && . ./.env`; Docker passes it with `--env-file .env` from that same directory.
+This app uses bacpypes3 CLI-style arguments to configure a BACnet server (`--name`, `--instance`, `--address`), similar to running commands directly in the bacpypes3 shell.
 
-### Python (local)
+### BACnet Shell Reference
 
-Create a gitignored `.env` with one line, `BACNET_RPC_API_KEY=…`. The server expects that value on `Authorization: Bearer`; in Swagger use Authorize and paste the same secret.
+When running the bacpypes3 module interactively:
 
-If you are **already** in a clone of this repo, do **not** run `git clone` again (that nests a second copy inside the first). Only use `git clone` / `cd` on a fresh machine.
+```bash
+> help
+commands: config, exit, help, iam, ihave, irt, rbdt, read, rfdt, rpm, wbdt, whohas, whois, wirtn, write
+```
+
+#### Example: Device Discovery (`whois`)
+
+```bash
+> whois
+```
+
+Example output (trimmed):
+
+```
+3456788 192.168.204.16
+3456789 192.168.204.13
+3456790 192.168.204.14
+```
+
+#### Common Commands
+
+```bash
+# Discover devices in a range
+whois 1000 3456799
+
+# Read a point
+read 192.168.204.13 analog-input,1 present-value
+
+# Write a value (priority 9)
+write 192.168.204.14 analog-output,1 present-value 999.8 9
+
+# Release a command (null write)
+write 192.168.204.14 analog-output,1 present-value null 9
+```
+
+---
+
+## Server Flags
+
+The app supports the same flags as bacpypes3:
+
+* `--name` → Device name
+* `--instance` → Device instance ID
+* `--address` → IP/subnet/port (optional)
+* `--public` → Enable LAN HTTP access + `/docs`
+
+> Tip: Omit `--address` when a single NIC is sufficient.
+
+---
+
+## Python (Local Setup)
+
+This example sets up the server locally and generates a Bearer token via a `.env` file.
 
 ```bash
 git clone https://github.com/bbartling/diy-bacnet-server.git
 cd diy-bacnet-server
-python3 -m venv .venv && . .venv/bin/activate
+
+python3 -m venv .venv
+. .venv/bin/activate
+
 pip install -e ".[dev]"
+
+# Create API key
 printf 'BACNET_RPC_API_KEY=%s\n' "$(openssl rand -hex 32)" > .env
+
+# Load environment variables
 set -a && . ./.env && set +a
-python -m bacpypes_server.main --name asdf --instance 123456 --address 192.168.204.18/24:47808 --public --debug
+
+# Run server
+python -m bacpypes_server.main \
+  --name my-device \
+  --instance 123456 \
+  --address 192.168.204.18/24:47808 \
+  --public \
+  --debug
 ```
 
-With `--public`, open `http://127.0.0.1:8080/docs` (or this host’s LAN IP from another machine). `POST /server_hello` stays unauthenticated; other JSON-RPC routes need Bearer when a key is set. Who-Is and discovery match bacpypes3 once UDP 47808 is allowed through the host firewall. Skip `.env` only for unsecured loopback tests.
+---
+
+## Accessing the API
+
+With `--public` enabled:
+
+* Open API docs:
+
+  ```
+  http://127.0.0.1:8080/docs
+  ```
+
+  (or use the host’s LAN IP from another machine)
+
+### Authentication
+
+* `POST /server_hello` → No auth required
+* All other JSON-RPC endpoints → Require Bearer token (if API key is set)
+
+---
+
+## Notes
+
+* Ensure UDP port **47808** is open for BACnet discovery (Who-Is / I-Am).
+* The `.env` file is optional for local, unsecured loopback testing.
+* Behavior should match standard bacpypes3 discovery and communication patterns.
+
+### Common Gotcha: Firewall (Same Story as BACnet)
+
+The most common issue is firewall configuration.
+
+You may already have UDP `47808` open for BACnet, but the HTTP API (JSON-RPC / Swagger) runs on **TCP 8080**. This can cause a confusing situation where:
+
+* `curl` or browser **works locally on the server**
+* but **fails from another machine on the LAN**
+
+#### Fix (UFW examples)
+
+Allow port 8080:
+
+```bash
+sudo ufw allow in on enp3s0 to any port 8080 proto tcp comment 'diy-bacnet HTTP'
+```
+
+Or more broadly:
+
+```bash
+sudo ufw allow 8080/tcp
+```
+
+Verify:
+
+```bash
+sudo ufw status numbered
+```
+
+#### Test from another machine on the LAN
+
+```bash
+curl -sS -o /dev/null -w '%{http_code}\n' http://192.168.204.18:8080/docs
+```
+
+Expected result:
+
+```
+200
+```
+
+If you don’t see `200`, it’s almost always a firewall or network interface binding issue.
+
+---
 
 ### Docker
 
@@ -41,7 +176,6 @@ git clone https://github.com/bbartling/diy-bacnet-server.git
 cd diy-bacnet-server
 printf 'BACNET_RPC_API_KEY=%s\n' "$(openssl rand -hex 32)" > .env
 docker build -t diy-bacnet-server .
-# In-container pytest (e.g. Open-FDD bootstrap --diy-bacnet-tests): add --build-arg BUILD_TESTS=true
 docker run --rm -it --network host --env-file .env --name diy-bacnet-gateway diy-bacnet-server \
   python3 -u -m bacpypes_server.main \
   --name asdf --instance 123456 --address 192.168.204.18/24:47808 --public --debug
@@ -53,6 +187,12 @@ Swagger **Authorize** uses the same `BACNET_RPC_API_KEY` value as in that file.
 
 - [bbartling.github.io/diy-bacnet-server](https://bbartling.github.io/diy-bacnet-server/)
 
+## Dependancies
+
+- Python 3.12+ (for local runs and tests)
+- `pip` + virtual environment tooling (`python3 -m venv`)
+- Docker (for container runs); use `--network host` for BACnet/IP behavior
+- OpenSSL (optional, used in examples to generate `BACNET_RPC_API_KEY`)
 ## License
 
 MIT. See `LICENSE`.

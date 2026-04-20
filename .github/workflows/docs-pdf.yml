@@ -1,5 +1,5 @@
 # Regenerate pdf/diy-bacnet-server-docs.pdf (+ .txt) when docs or the builder change.
-# Opens a PR when artifacts change (same pattern as easy-aso).
+# Publishes artifacts only (no bot PR branch/PR creation).
 
 name: Docs PDF
 
@@ -14,8 +14,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: docs-pdf-${{ github.ref }}
@@ -24,9 +23,6 @@ concurrency:
 jobs:
   pdf:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
       - uses: actions/checkout@v5
         with:
@@ -57,27 +53,3 @@ jobs:
           path: |
             pdf/diy-bacnet-server-docs.pdf
             pdf/diy-bacnet-server-docs.txt
-
-      - name: Open PR with updated docs bundle (if changed)
-        id: docs_pdf_pr
-        continue-on-error: true
-        uses: peter-evans/create-pull-request@v7
-        with:
-          branch: chore/docs-pdf-refresh
-          commit-message: "chore(docs): regenerate docs PDF and text bundle"
-          title: "chore(docs): regenerate docs PDF and text bundle"
-          body: |
-            Automated refresh from **Docs PDF** workflow ([`.github/workflows/docs-pdf.yml`](.github/workflows/docs-pdf.yml)).
-
-            Merge when ready so `pdf/diy-bacnet-server-docs.pdf` and `pdf/diy-bacnet-server-docs.txt` stay current.
-          add-paths: |
-            pdf/diy-bacnet-server-docs.pdf
-            pdf/diy-bacnet-server-docs.txt
-          committer: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
-          author: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
-          delete-branch: true
-
-      - name: Warn when PR automation is blocked
-        if: steps.docs_pdf_pr.outcome == 'failure'
-        run: |
-          echo '::warning title=Docs PDF PR blocked::Could not open a PR (repo/org may disallow Actions-initiated pull requests). Enable Settings → Actions → General → Allow GitHub Actions to create and approve pull requests. PDF and .txt are still uploaded as workflow artifacts.'

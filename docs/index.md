@@ -75,4 +75,4 @@ docker run --rm -it --network host --env-file .env --name diy-bacnet-gateway diy
 
 **BACnet stays in one process.** The same bacpypes3 `Application` hosts CSV objects and performs client work on the OT LAN. Callers use **HTTP + JSON-RPC** (and optionally MQTT); BACnet stays on UDP.
 
-For a full building stack (DB, UI, rules engine), see the separate **[open-fdd-afdd-stack](https://github.com/bbartling/open-fdd-afdd-stack)** docs under [`docs/`](https://github.com/bbartling/open-fdd-afdd-stack/tree/main/docs).
+This project is intentionally standalone: use it directly from your own scripts, services, and edge workflows without requiring a specific upstream stack.

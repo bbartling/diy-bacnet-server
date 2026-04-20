@@ -24,3 +24,12 @@ nav_order: 10
 | `MQTT_RPC_TOPIC_PREFIX` | RPC topic prefix (default `diy-bacnet/gateway`). |
 | `MQTT_RPC_TELEMETRY_INTERVAL_SEC` | Telemetry interval; `0` disables periodic `telemetry/status`. |
 | `MQTT_RPC_CLIENT_ID` | Optional MQTT client id. |
+
+## Bearer token notes
+
+- Keep `BACNET_RPC_API_KEY` set for any non-trivial deployment (LAN/edge/shared host).
+- The same key value is used by:
+  - direct HTTP clients sending `Authorization: Bearer <key>`
+  - Swagger **Authorize** in `/docs`
+  - any external service that proxies/forwards requests into this gateway
+- `POST /server_hello` remains exempt so health/reachability checks can run without a token.
