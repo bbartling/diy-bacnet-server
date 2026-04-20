@@ -33,8 +33,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-asyncio", "pyyaml"]
-# Minimal deps for `python3 -m pytest tests/` inside the published Docker image.
-test = ["pytest", "pytest-asyncio"]
+# Minimal pytest deps for `python3 -m pytest tests/` inside a Docker image built with `.[test]`.
+# Keep this lean for general users, but include PyYAML because tests/test_docs_integrity.py imports `yaml`.
+# This also keeps Open-FDD AFDD stack maintenance (`bootstrap.sh --diy-bacnet-tests`) green when BUILD_TESTS=true.
+test = ["pytest", "pytest-asyncio", "pyyaml"]
 
 [project.urls]
 Homepage = "https://github.com/bbartling/diy-bacnet-server"

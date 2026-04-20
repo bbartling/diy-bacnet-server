@@ -12,7 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 # Install from pyproject.toml (unpinned deps; resolve at image build time).
-# Production default: runtime only. Set BUILD_TESTS=true (see Open-FDD stack compose) for pytest in-image.
+# Production default is runtime-only (`.`). Test deps are opt-in via BUILD_TESTS=true (`.[test]`).
+# Note: `.[test]` is intentionally the minimal container test set used by stack-maintenance flows
+# (for example Open-FDD AFDD `bootstrap.sh --diy-bacnet-tests`); it is not required for normal runtime use.
 ARG BUILD_TESTS=false
 COPY . /app
 RUN if [ "$BUILD_TESTS" = "true" ]; then \
