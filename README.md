@@ -16,7 +16,6 @@ This app uses bacpypes3 CLI-style arguments to configure a BACnet server (`--nam
 ### BACnet Shell Reference
 
 When running the bacpypes3 module interactively:
-
 ```bash
 > help
 commands: config, exit, help, iam, ihave, irt, rbdt, read, rfdt, rpm, wbdt, whohas, whois, wirtn, write

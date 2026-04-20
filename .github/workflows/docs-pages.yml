@@ -44,7 +44,8 @@ jobs:
           path: _site
 
   deploy:
-    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    # Repo environment policy currently allows deployments only from `develop`.
+    if: github.ref == 'refs/heads/develop'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
