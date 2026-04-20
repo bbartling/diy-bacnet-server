@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "diy-bacnet-server"
-version = "0.1.0"
+version = "0.2.0"
 description = "BACnet/IP + JSON-RPC edge microservice for Docker-based deployments; optional Modbus TCP and MQTT."
 readme = "README.md"
 requires-python = ">=3.12"

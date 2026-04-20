@@ -11,9 +11,38 @@ Lightweight BACnet/IP + JSON-RPC edge microservice for Docker-based deployments,
 
 ## Quick Start
 
-This app uses bacpypes3 CLI-style arguments to configure a BACnet server (`--name`, `--instance`, `--address`), similar to running commands directly in the bacpypes3 shell.
+This app uses bacpypes3 CLI-style arguments to configure a BACnet server (`--name`, `--instance`, `--address`), similar to running commands directly in the bacpypes3 shell. 
 
 ### BACnet Shell Reference
+
+This is a mini tutorial for bacpypes3, which is great for troubleshooting and serves as a useful step for testing deployments before moving on to the DIY BACnet server application.
+
+```bash
+# Create virtual environment
+python -m venv env
+
+# Activate (Linux / macOS)
+. env/bin/activate
+
+# Install dependencies
+pip install bacpypes3 ifaddr
+```
+
+### Run bacpypes3 Test Instance
+
+The bacpypes3 library supports a shell mode out of the box, as shown directly below. Further down, we’ll cover setup for the full-featured DIY BACnet server, which includes a web app powered by FastAPI and supports easy Docker deployments.
+
+
+```bash
+python -m bacpypes3 \
+  --name BensRawBacpypes3Test \
+  --address 192.168.204.12/24 \
+  --instance 123456 \
+  --debug
+```
+
+This will start a basic BACnet device on your network for testing discovery (`whois`) and communication.
+
 
 When running the bacpypes3 module interactively:
 ```bash
@@ -66,9 +95,9 @@ The app supports the same flags as bacpypes3:
 
 ---
 
-## Python (Local Setup)
+## Python (Local Setup) diy-bacnet-server
 
-This example sets up the server locally and generates a Bearer token via a `.env` file.
+This example sets up the `diy-bacnet-server` server locally and generates a Bearer token via a `.env` file.
 
 ```bash
 git clone https://github.com/bbartling/diy-bacnet-server.git
@@ -166,7 +195,7 @@ If you don’t see `200`, it’s almost always a firewall or network interface b
 
 ---
 
-### Docker
+## Docker diy-bacnet-server
 
 `--network host` is a Docker option: the container shares the host’s network stack instead of a private bridge/NAT network. That keeps BACnet/IP (UDP broadcasts and port 47808) behaving like running Python directly on the machine. Swagger **Authorize** still uses the same `BACNET_RPC_API_KEY` value you put in `.env`. Skip `git clone` / `cd` if you already have the repo.
 
