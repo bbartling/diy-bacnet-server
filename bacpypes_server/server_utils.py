@@ -49,6 +49,19 @@ point_map: Dict[str, Object] = {}
 # All supported CSV PointType codes (BACnet object types)
 SUPPORTED_POINT_TYPES = {"AI", "AO", "AV", "BI", "BO", "BV", "MSI", "MSO", "MSV", "Schedule"}
 
+POINTTYPE_TO_OBJECT_KIND = {
+    "AI": "analogInput",
+    "AO": "analogOutput",
+    "AV": "analogValue",
+    "BI": "binaryInput",
+    "BO": "binaryOutput",
+    "BV": "binaryValue",
+    "MSI": "multiStateInput",
+    "MSO": "multiStateOutput",
+    "MSV": "multiStateValue",
+    "Schedule": "schedule",
+}
+
 
 class CommandableAnalogValueObject(Commandable, AnalogValueObject):
     """Commandable Analog Value Object"""
@@ -114,6 +127,7 @@ async def load_csv_and_create_objects(app):
             "multiStateValue": 1,
             "schedule": 1,
         }
+        used_instances: set[tuple[str, int]] = set()
 
         for idx, row in enumerate(reader, start=2):
             try:
@@ -123,10 +137,66 @@ async def load_csv_and_create_objects(app):
                 commandable = row.get("Commandable", "").strip().upper() == "Y"
                 default_val_str = row.get("Default", "").strip()
                 states_str = (row.get("States") or "").strip()  # optional for MSI, MSO, MSV
+                instance_str = (row.get("Instance") or "").strip()
+                cov_increment_str = (row.get("CovIncrement") or "").strip()
 
                 if not name or point_type not in SUPPORTED_POINT_TYPES:
                     logger.warning(f"Skipping invalid row {idx}: {row}")
                     continue
+
+                obj_kind = POINTTYPE_TO_OBJECT_KIND[point_type]
+                if instance_str:
+                    try:
+                        instance_num = int(instance_str)
+                    except ValueError as err:
+                        raise ValueError(
+                            f"row {idx} ({name}): Instance must be an integer, got {instance_str!r}"
+                        ) from err
+                    if not 0 <= instance_num <= 4194303:
+                        raise ValueError(
+                            f"row {idx} ({name}): Instance out of BACnet range 0..4194303, got {instance_num}"
+                        )
+                else:
+                    while (
+                        instance_ids[obj_kind] <= 4194303
+                        and (obj_kind, instance_ids[obj_kind]) in used_instances
+                    ):
+                        instance_ids[obj_kind] += 1
+                    if instance_ids[obj_kind] > 4194303:
+                        raise ValueError(
+                            f"row {idx} ({name}): no available auto-assigned instances left for {obj_kind}"
+                        )
+                    instance_num = instance_ids[obj_kind]
+                    instance_ids[obj_kind] += 1
+
+                key = (obj_kind, instance_num)
+                if key in used_instances:
+                    raise ValueError(
+                        f"row {idx} ({name}): duplicate objectIdentifier ({obj_kind}, {instance_num})"
+                    )
+                used_instances.add(key)
+
+                cov_increment = 1.0
+                analog_types = {"AI", "AO", "AV"}
+                if cov_increment_str:
+                    if point_type in analog_types:
+                        try:
+                            cov_increment = float(cov_increment_str)
+                        except ValueError as err:
+                            raise ValueError(
+                                f"row {idx} ({name}): CovIncrement must be numeric, got {cov_increment_str!r}"
+                            ) from err
+                        if cov_increment <= 0:
+                            raise ValueError(
+                                f"row {idx} ({name}): CovIncrement must be > 0, got {cov_increment}"
+                            )
+                    else:
+                        logger.warning(
+                            "row %s (%s): CovIncrement is ignored for PointType=%s",
+                            idx,
+                            name,
+                            point_type,
+                        )
 
                 engineering_unit = resolve_unit(unit_str)
                 obj = None
@@ -137,17 +207,16 @@ async def load_csv_and_create_objects(app):
                     except ValueError:
                         initial_value = 0.0
                     obj = AnalogInputObject(
-                        objectIdentifier=("analogInput", instance_ids["analogInput"]),
+                        objectIdentifier=("analogInput", instance_num),
                         objectName=name,
                         presentValue=Real(initial_value),
                         statusFlags=[0, 0, 0, 0],
                         eventState="normal",
                         outOfService=False,
                         units=engineering_unit,
-                        covIncrement=1.0,
+                        covIncrement=cov_increment,
                         description="Analog Input from CSV",
                     )
-                    instance_ids["analogInput"] += 1
 
                 elif point_type == "AO":
                     try:
@@ -155,18 +224,17 @@ async def load_csv_and_create_objects(app):
                     except ValueError:
                         initial_value = 0.0
                     obj = AnalogOutputObject(
-                        objectIdentifier=("analogOutput", instance_ids["analogOutput"]),
+                        objectIdentifier=("analogOutput", instance_num),
                         objectName=name,
                         presentValue=Real(initial_value),
                         statusFlags=[0, 0, 0, 0],
                         eventState="normal",
                         outOfService=False,
                         units=engineering_unit,
-                        covIncrement=1.0,
+                        covIncrement=cov_increment,
                         relinquishDefault=Real(initial_value),
                         description="Analog Output from CSV",
                     )
-                    instance_ids["analogOutput"] += 1
                     commandable_point_names.add(name)
 
                 elif point_type == "AV":
@@ -179,16 +247,15 @@ async def load_csv_and_create_objects(app):
                         if commandable
                         else AnalogValueObject
                     )(
-                        objectIdentifier=("analogValue", instance_ids["analogValue"]),
+                        objectIdentifier=("analogValue", instance_num),
                         objectName=name,
                         presentValue=Real(initial_value),
                         relinquishDefault=Real(initial_value) if commandable else None,
                         statusFlags=[0, 0, 0, 0],
-                        covIncrement=1.0,
+                        covIncrement=cov_increment,
                         units=engineering_unit,
                         description="Analog Value from CSV",
                     )
-                    instance_ids["analogValue"] += 1
                     if commandable:
                         commandable_point_names.add(name)
 
@@ -196,7 +263,7 @@ async def load_csv_and_create_objects(app):
                     is_active = default_val_str.lower() in {"true", "active", "1", "y", "yes", "on"} if default_val_str else False
                     initial_value = "active" if is_active else "inactive"
                     obj = BinaryInputObject(
-                        objectIdentifier=("binaryInput", instance_ids["binaryInput"]),
+                        objectIdentifier=("binaryInput", instance_num),
                         objectName=name,
                         presentValue=initial_value,
                         statusFlags=[0, 0, 0, 0],
@@ -205,13 +272,12 @@ async def load_csv_and_create_objects(app):
                         polarity="normal",
                         description="Binary Input from CSV",
                     )
-                    instance_ids["binaryInput"] += 1
 
                 elif point_type == "BO":
                     is_active = default_val_str.lower() in {"true", "active", "1", "y", "yes", "on"} if default_val_str else False
                     initial_value = "active" if is_active else "inactive"
                     obj = BinaryOutputObject(
-                        objectIdentifier=("binaryOutput", instance_ids["binaryOutput"]),
+                        objectIdentifier=("binaryOutput", instance_num),
                         objectName=name,
                         presentValue=initial_value,
                         statusFlags=[0, 0, 0, 0],
@@ -221,7 +287,6 @@ async def load_csv_and_create_objects(app):
                         relinquishDefault=initial_value,
                         description="Binary Output from CSV",
                     )
-                    instance_ids["binaryOutput"] += 1
                     commandable_point_names.add(name)
 
                 elif point_type == "BV":
@@ -232,14 +297,13 @@ async def load_csv_and_create_objects(app):
                         if commandable
                         else BinaryValueObject
                     )(
-                        objectIdentifier=("binaryValue", instance_ids["binaryValue"]),
+                        objectIdentifier=("binaryValue", instance_num),
                         objectName=name,
                         presentValue=initial_value,
                         relinquishDefault=initial_value if commandable else None,
                         statusFlags=[0, 0, 0, 0],
                         description="Binary Value from CSV",
                     )
-                    instance_ids["binaryValue"] += 1
                     if commandable:
                         commandable_point_names.add(name)
 
@@ -255,7 +319,7 @@ async def load_csv_and_create_objects(app):
                         except ValueError:
                             pass
                     obj = MultiStateInputObject(
-                        objectIdentifier=("multiStateInput", instance_ids["multiStateInput"]),
+                        objectIdentifier=("multiStateInput", instance_num),
                         objectName=name,
                         presentValue=initial_value,
                         statusFlags=[0, 0, 0, 0],
@@ -264,7 +328,6 @@ async def load_csv_and_create_objects(app):
                         numberOfStates=num_states,
                         description="Multistate Input from CSV",
                     )
-                    instance_ids["multiStateInput"] += 1
 
                 elif point_type == "MSO":
                     try:
@@ -278,7 +341,7 @@ async def load_csv_and_create_objects(app):
                         except ValueError:
                             pass
                     obj = MultiStateOutputObject(
-                        objectIdentifier=("multiStateOutput", instance_ids["multiStateOutput"]),
+                        objectIdentifier=("multiStateOutput", instance_num),
                         objectName=name,
                         presentValue=initial_value,
                         statusFlags=[0, 0, 0, 0],
@@ -288,7 +351,6 @@ async def load_csv_and_create_objects(app):
                         relinquishDefault=initial_value,
                         description="Multistate Output from CSV",
                     )
-                    instance_ids["multiStateOutput"] += 1
                     commandable_point_names.add(name)
 
                 elif point_type == "MSV":
@@ -303,7 +365,7 @@ async def load_csv_and_create_objects(app):
                         except ValueError:
                             pass
                     obj = MultiStateValueObject(
-                        objectIdentifier=("multiStateValue", instance_ids["multiStateValue"]),
+                        objectIdentifier=("multiStateValue", instance_num),
                         objectName=name,
                         presentValue=initial_value,
                         statusFlags=[0, 0, 0, 0],
@@ -312,7 +374,6 @@ async def load_csv_and_create_objects(app):
                         numberOfStates=num_states,
                         description="Multistate Value from CSV",
                     )
-                    instance_ids["multiStateValue"] += 1
                     if commandable:
                         commandable_point_names.add(name)
 
@@ -335,7 +396,7 @@ async def load_csv_and_create_objects(app):
                     weekend = DailySchedule(daySchedule=[_time_val(0, 0, 0, 0)])
                     weekly = [weekday, weekday, weekday, weekday, weekday, weekend, weekend]
                     obj = ScheduleObject(
-                        objectIdentifier=("schedule", instance_ids["schedule"]),
+                        objectIdentifier=("schedule", instance_num),
                         objectName=name,
                         presentValue=Integer(0),
                         effectivePeriod=DateRange(
@@ -352,7 +413,6 @@ async def load_csv_and_create_objects(app):
                         outOfService=False,
                         description="Schedule from CSV (M–F 8–17)",
                     )
-                    instance_ids["schedule"] += 1
 
                 if obj is not None:
                     app.add_object(obj)
