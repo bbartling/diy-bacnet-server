@@ -13,7 +13,7 @@ from bacpypes_server.rest_whois_nested import (
     register_whois_nested_rest_routes,
 )
 from bacpypes_server.modbus_routes import register_modbus_routes
-from bacpypes_server.rpc_methods import rpc
+from bacpypes_server.rpc_methods import CLIENT_TAG, SERVER_TAG, rpc
 
 
 _openapi = openapi_docs_enabled()
@@ -31,8 +31,8 @@ rpc_api = jsonrpc.API(
     version="1.0",
     description=_rpc_desc,
     openapi_tags=[
-        {"name": "BACnet Server", "description": "Server object-map RPC endpoints (read/update local hosted points)."},
-        {"name": "BACnet Client", "description": "BACnet network client RPC endpoints (whois/read/write/discovery)."},
+        {"name": SERVER_TAG, "description": "Server object-map RPC endpoints (read/update local hosted points)."},
+        {"name": CLIENT_TAG, "description": "BACnet network client RPC endpoints (whois/read/write/discovery)."},
     ],
     docs_url=_docs_url,
     redoc_url=_redoc_url,

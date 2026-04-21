@@ -117,3 +117,50 @@ async def test_loader_mixed_explicit_and_auto_instance_uses_next_available(tmp_p
     rat = server_utils.point_map["rat"]
     assert int(tuple(sat.objectIdentifier)[1]) == 1
     assert int(tuple(rat.objectIdentifier)[1]) == 2
+
+
+@pytest.mark.asyncio
+async def test_loader_invalid_covincrement_nan_skips_row(tmp_path, monkeypatch):
+    csv_path = tmp_path / "points.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "Name,PointType,Units,Commandable,Default,Instance,CovIncrement",
+                "bad-nan,AV,degreesFahrenheit,N,70.0,30,nan",
+                "good,AV,degreesFahrenheit,N,71.0,31,0.5",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(server_utils, "CSV_FILE", str(csv_path))
+
+    app = _DummyApp()
+    await server_utils.load_csv_and_create_objects(app)
+
+    assert "bad-nan" not in server_utils.point_map
+    assert "good" in server_utils.point_map
+
+
+@pytest.mark.asyncio
+async def test_loader_invalid_row_does_not_reserve_instance(tmp_path, monkeypatch):
+    csv_path = tmp_path / "points.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "Name,PointType,Units,Commandable,Default,Instance,CovIncrement",
+                "bad,AV,degreesFahrenheit,N,70.0,40,0",
+                "good-explicit,AV,degreesFahrenheit,N,71.0,40,0.5",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(server_utils, "CSV_FILE", str(csv_path))
+
+    app = _DummyApp()
+    await server_utils.load_csv_and_create_objects(app)
+
+    assert "bad" not in server_utils.point_map
+    # Instance 40 should still be available because invalid rows must not reserve it.
+    assert int(tuple(server_utils.point_map["good-explicit"].objectIdentifier)[1]) == 40

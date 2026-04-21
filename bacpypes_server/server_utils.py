@@ -6,6 +6,7 @@
 import os
 import glob
 import csv
+import math
 import logging
 from datetime import datetime
 from typing import Dict
@@ -174,7 +175,6 @@ async def load_csv_and_create_objects(app):
                     raise ValueError(
                         f"row {idx} ({name}): duplicate objectIdentifier ({obj_kind}, {instance_num})"
                     )
-                used_instances.add(key)
 
                 cov_increment = 1.0
                 analog_types = {"AI", "AO", "AV"}
@@ -186,9 +186,9 @@ async def load_csv_and_create_objects(app):
                             raise ValueError(
                                 f"row {idx} ({name}): CovIncrement must be numeric, got {cov_increment_str!r}"
                             ) from err
-                        if cov_increment <= 0:
+                        if not math.isfinite(cov_increment) or cov_increment <= 0:
                             raise ValueError(
-                                f"row {idx} ({name}): CovIncrement must be > 0, got {cov_increment}"
+                                f"row {idx} ({name}): CovIncrement must be a finite number > 0, got {cov_increment}"
                             )
                     else:
                         logger.warning(
@@ -415,6 +415,7 @@ async def load_csv_and_create_objects(app):
                     )
 
                 if obj is not None:
+                    used_instances.add(key)
                     app.add_object(obj)
                     point_map[name] = obj
                     logger.debug(f"Added {point_type} {name} (Cmd={commandable})")
