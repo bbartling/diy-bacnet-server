@@ -30,6 +30,10 @@ rpc_api = jsonrpc.API(
     title="diy-bacnet-server",
     version="1.0",
     description=_rpc_desc,
+    openapi_tags=[
+        {"name": "BACnet Server", "description": "Server object-map RPC endpoints (read/update local hosted points)."},
+        {"name": "BACnet Client", "description": "BACnet network client RPC endpoints (whois/read/write/discovery)."},
+    ],
     docs_url=_docs_url,
     redoc_url=_redoc_url,
     openapi_url=_openapi_url,
@@ -48,12 +52,9 @@ install_openapi_servers_url_from_env(rpc_api)
 
 @rpc_api.router.get("/")
 async def root_info():
-    """Service discovery; Swagger follows ``BACNET_ENABLE_OPENAPI_DOCS``."""
+    """Default discovery route points users to server_hello RPC."""
     return {
         "service": "diy-bacnet-server",
-        "message": (
-            "JSON-RPC BACnet gateway. Swagger UI may be at /docs on this deployment."
-            if _openapi
-            else "JSON-RPC BACnet gateway. Interactive docs are disabled; POST JSON-RPC to this server."
-        ),
+        "default_rpc_route": "/server_hello",
+        "message": "Use POST /server_hello as the default health/discovery RPC route.",
     }
