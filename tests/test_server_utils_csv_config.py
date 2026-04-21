@@ -164,3 +164,31 @@ async def test_loader_invalid_row_does_not_reserve_instance(tmp_path, monkeypatc
     assert "bad" not in server_utils.point_map
     # Instance 40 should still be available because invalid rows must not reserve it.
     assert int(tuple(server_utils.point_map["good-explicit"].objectIdentifier)[1]) == 40
+
+
+@pytest.mark.asyncio
+async def test_loader_schedule_pointtype_is_accepted(tmp_path, monkeypatch):
+    csv_path = tmp_path / "points.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "Name,PointType,Units,Commandable,Default,Instance,CovIncrement",
+                "occupancy-schedule,Schedule,Status,N,0,1,",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(server_utils, "CSV_FILE", str(csv_path))
+
+    app = _DummyApp()
+    await server_utils.load_csv_and_create_objects(app)
+
+    assert "occupancy-schedule" in server_utils.point_map
+    schedule = server_utils.point_map["occupancy-schedule"]
+    assert int(tuple(schedule.objectIdentifier)[1]) == 1
+    assert getattr(schedule, "weeklySchedule", None) is not None
+    # If supported by BACpypes3 build, this should exist as an empty list.
+    # On older builds the loader falls back without this property.
+    if hasattr(schedule, "exceptionSchedule"):
+        assert schedule.exceptionSchedule == []
