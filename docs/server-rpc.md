@@ -9,6 +9,13 @@ Hosted BACnet objects are created from the **single root CSV** (see [CSV point m
 
 For the authoritative JSON-RPC contract (schemas, paths), use the live OpenAPI docs at `http://<edge-host>:8080/docs` on a running gateway.
 
+## Swagger grouping and defaults
+
+- Swagger/OpenAPI groups RPC routes into:
+  - **BACnet Server**: hosted point-map read/update endpoints.
+  - **BACnet Client**: BACnet network client operations (`whois`, discovery, read/write).
+- Default health/discovery RPC route is `POST /server_hello`.
+
 ## `server_hello`
 
 - **HTTP:** `POST /server_hello`
@@ -20,6 +27,8 @@ For the authoritative JSON-RPC contract (schemas, paths), use the live OpenAPI d
 - **HTTP:** `POST /server_read_all_values`
 - **Params:** `{}`
 - **Returns:** map of point name → encoded `presentValue`.
+
+Primary server-read RPC for hosted BACnet points.
 
 ## `server_read_commandable`
 
@@ -33,6 +42,8 @@ For the authoritative JSON-RPC contract (schemas, paths), use the live OpenAPI d
 - **Params:** `{ "update": { "<point_name>": <value>, ... } }`
 - **Behaviour:** updates **non-commandable** server-owned points. **Skips** names in `commandable_point_names`.
 - **Returns:** `{ "updated_bacnet_points": { "<name>": "changed from … → …" \| "skipped …" \| "not found" \| "error: …" } }`
+
+Primary server-write RPC for hosted BACnet points.
 
 ## `server_read_schedule`
 

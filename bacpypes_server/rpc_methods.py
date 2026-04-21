@@ -78,6 +78,8 @@ logger = logging.getLogger("rpc_methods")
 
 # This becomes the prefix path, like /bacnet
 rpc = jsonrpc.Entrypoint("")
+SERVER_TAG = "BACnet Server"
+CLIENT_TAG = "BACnet Client"
 
 
 def parse_object_identifier(oid_str: str) -> ObjectIdentifier:
@@ -86,7 +88,7 @@ def parse_object_identifier(oid_str: str) -> ObjectIdentifier:
     return ObjectIdentifier((obj_type, obj_inst))
 
 
-@rpc.method()
+@rpc.method(tags=[SERVER_TAG], summary="Server hello")
 def server_hello() -> dict:
     return {
         "message": "BACnet RPC API ready. See GET / for deployment info; use JSON-RPC or REST routes as documented."
@@ -94,7 +96,7 @@ def server_hello() -> dict:
 
 
 # ──────── BACNET SERVER UTILS METHODS ────────
-@rpc.method()
+@rpc.method(tags=[SERVER_TAG], summary="Server update points")
 def server_update_points(update: PointUpdate) -> dict:
     result = {}
     for name, value in update.root.items():
@@ -159,7 +161,7 @@ def server_update_points(update: PointUpdate) -> dict:
     return {"updated_bacnet_points": result}
 
 
-@rpc.method()
+@rpc.method(tags=[SERVER_TAG], summary="Server read commandable")
 def server_read_commandable() -> dict:
     result = {}
     commandable_types = (
@@ -187,7 +189,7 @@ def server_read_commandable() -> dict:
     return result
 
 
-@rpc.method()
+@rpc.method(tags=[SERVER_TAG], summary="Server read all point values")
 def server_read_all_values() -> dict:
     result = {}
     for name, obj in point_map.items():
@@ -200,7 +202,7 @@ def server_read_all_values() -> dict:
     return result
 
 
-@rpc.method()
+@rpc.method(tags=[SERVER_TAG], summary="Server read schedule")
 def server_read_schedule(request: ServerScheduleReadRequest) -> dict:
     obj = point_map.get(request.name)
     if obj is None:
@@ -214,7 +216,7 @@ def server_read_schedule(request: ServerScheduleReadRequest) -> dict:
     return {"name": request.name, "status": "ok", "schedule": server_schedule_to_json(obj)}
 
 
-@rpc.method()
+@rpc.method(tags=[SERVER_TAG], summary="Server update schedule")
 def server_update_schedule(update: ServerScheduleUpdateRequest) -> dict:
     obj = point_map.get(update.name)
     if obj is None:
@@ -242,7 +244,7 @@ def server_update_schedule(update: ServerScheduleUpdateRequest) -> dict:
 # ──────── BACNET CLIENT UTILS METHODS ────────
 
 
-@rpc.method()
+@rpc.method(tags=[CLIENT_TAG], summary="Client read property")
 async def client_read_property(request: SingleReadRequest) -> dict:
     try:
         return await bacnet_read(
@@ -257,7 +259,7 @@ async def client_read_property(request: SingleReadRequest) -> dict:
         )
 
 
-@rpc.method()
+@rpc.method(tags=[CLIENT_TAG], summary="Client write property")
 async def client_write_property(request: WritePropertyRequest) -> dict:
     try:
         return await bacnet_write(
@@ -274,7 +276,7 @@ async def client_write_property(request: WritePropertyRequest) -> dict:
         )
 
 
-@rpc.method()
+@rpc.method(tags=[CLIENT_TAG], summary="Client read multiple properties")
 async def client_read_multiple(
     request: ReadMultiplePropertiesRequestWrapper,
 ) -> BaseResponse:
@@ -308,7 +310,7 @@ async def client_read_multiple(
     )
 
 
-@rpc.method()
+@rpc.method(tags=[CLIENT_TAG], summary="Client whois range")
 async def client_whois_range(request: DeviceInstanceRange) -> BaseResponse:
     try:
         data = await perform_who_is(
@@ -329,7 +331,7 @@ async def client_whois_range(request: DeviceInstanceRange) -> BaseResponse:
         )
 
 
-@rpc.method()
+@rpc.method(tags=[CLIENT_TAG], summary="Client point discovery")
 async def client_point_discovery(instance: DeviceInstanceOnly) -> BaseResponse:
     try:
         data = await point_discovery(instance.device_instance)
@@ -349,7 +351,7 @@ async def client_point_discovery(instance: DeviceInstanceOnly) -> BaseResponse:
         )
 
 
-@rpc.method()
+@rpc.method(tags=[CLIENT_TAG], summary="Client supervisory logic checks")
 async def client_supervisory_logic_checks(
     instance: DeviceInstanceOnly,
 ) -> SupervisorySummary:
@@ -361,7 +363,7 @@ async def client_supervisory_logic_checks(
         )
 
 
-@rpc.method()
+@rpc.method(tags=[CLIENT_TAG], summary="Client read priority array")
 async def client_read_point_priority_array(request: ReadPriorityArrayRequest) -> list:
     logger.info(
         f"Reading priority array for device_instance={request.device_instance}, object_identifier={request.object_identifier}"
@@ -387,7 +389,7 @@ async def client_read_point_priority_array(request: ReadPriorityArrayRequest) ->
         raise PriorityArrayError(data={"detail": str(e)})
 
 
-@rpc.method()
+@rpc.method(tags=[CLIENT_TAG], summary="Client whois router-to-network")
 async def client_whois_router_to_network() -> BaseResponse:
     try:
         results = await perform_who_is_router_to_network()

@@ -4,6 +4,10 @@
 name: Docs PDF
 
 env:
+  # Temporary migration override: force JavaScript actions onto Node24 while GitHub transitions
+  # defaults (Node24 default June 2, 2026; Node20 removed Sept 2026).
+  # TODO: remove FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 once actions/checkout@v5,
+  # actions/setup-python@v6, and actions/upload-artifact@v4 have stable Node24 support.
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 on:

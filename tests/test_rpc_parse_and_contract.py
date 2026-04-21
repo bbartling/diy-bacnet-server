@@ -99,3 +99,26 @@ def test_server_read_schedule_request_shape(rpc_app):
     data = resp.json()
     assert "result" in data
     assert "status" in data["result"]
+
+
+def test_root_route_points_to_server_hello(rpc_app):
+    from fastapi.testclient import TestClient
+
+    client = TestClient(rpc_app)
+    resp = client.get("/")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data.get("default_rpc_route") == "/server_hello"
+
+
+def test_openapi_groups_client_and_server_tags(rpc_app):
+    schema = rpc_app.openapi()
+    tags = {t.get("name") for t in schema.get("tags", [])}
+    assert "BACnet Server" in tags
+    assert "BACnet Client" in tags
+
+    paths = schema.get("paths", {})
+    server_tags = paths.get("/server_update_points", {}).get("post", {}).get("tags", [])
+    client_tags = paths.get("/client_whois_range", {}).get("post", {}).get("tags", [])
+    assert "BACnet Server" in server_tags
+    assert "BACnet Client" in client_tags
