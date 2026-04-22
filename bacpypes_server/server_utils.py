@@ -47,8 +47,19 @@ commandable_point_names: set[str] = set()
 
 point_map: Dict[str, Object] = {}
 
-# All supported CSV PointType codes (BACnet object types)
-SUPPORTED_POINT_TYPES = {"AI", "AO", "AV", "BI", "BO", "BV", "MSI", "MSO", "MSV", "Schedule"}
+# All supported CSV PointType codes (BACnet object types), normalized uppercase.
+SUPPORTED_POINT_TYPES = {
+    "AI",
+    "AO",
+    "AV",
+    "BI",
+    "BO",
+    "BV",
+    "MSI",
+    "MSO",
+    "MSV",
+    "SCHEDULE",
+}
 
 POINTTYPE_TO_OBJECT_KIND = {
     "AI": "analogInput",
@@ -60,7 +71,7 @@ POINTTYPE_TO_OBJECT_KIND = {
     "MSI": "multiStateInput",
     "MSO": "multiStateOutput",
     "MSV": "multiStateValue",
-    "Schedule": "schedule",
+    "SCHEDULE": "schedule",
 }
 
 
@@ -377,8 +388,10 @@ async def load_csv_and_create_objects(app):
                     if commandable:
                         commandable_point_names.add(name)
 
-                elif point_type == "Schedule":
-                    # Minimal schedule: Mon–Fri 08:00→1, 17:00→0; Sat–Sun 0. No calendar exceptions.
+                elif point_type == "SCHEDULE":
+                    # Keep this minimal for broad BACpypes3 compatibility.
+                    # Extra optional fields can fail on some versions and cause
+                    # the row to be skipped silently in objectList discovery.
                     def _bacnet_date(y: int, m: int, d: int) -> Date:
                         dt = datetime(y, m, d)
                         dow = dt.weekday() + 1  # BACnet 1=Monday
@@ -395,7 +408,7 @@ async def load_csv_and_create_objects(app):
                     )
                     weekend = DailySchedule(daySchedule=[_time_val(0, 0, 0, 0)])
                     weekly = [weekday, weekday, weekday, weekday, weekday, weekend, weekend]
-                    obj = ScheduleObject(
+                    schedule_kwargs = dict(
                         objectIdentifier=("schedule", instance_num),
                         objectName=name,
                         presentValue=Integer(0),
@@ -404,15 +417,26 @@ async def load_csv_and_create_objects(app):
                             endDate=_bacnet_date(2030, 12, 31),
                         ),
                         weeklySchedule=weekly,
-                        exceptionSchedule=[],
                         scheduleDefault=Integer(0),
-                        listOfObjectPropertyReferences=[],
-                        priorityForWriting=1,
-                        statusFlags=[0, 0, 0, 0],
-                        reliability=Reliability.noFaultDetected,
-                        outOfService=False,
-                        description="Schedule from CSV (M–F 8–17)",
+                        description="Schedule from CSV (M-F 8-17)",
                     )
+                    # Expose exception-schedule when the BACpypes3 build supports it.
+                    # Fall back gracefully for older/incompatible versions.
+                    try:
+                        obj = ScheduleObject(
+                            **schedule_kwargs,
+                            exceptionSchedule=[],
+                        )
+                        logger.debug(
+                            "Schedule %s created with empty exceptionSchedule support",
+                            name,
+                        )
+                    except TypeError:
+                        obj = ScheduleObject(**schedule_kwargs)
+                        logger.warning(
+                            "Schedule %s created without exceptionSchedule property support",
+                            name,
+                        )
 
                 if obj is not None:
                     used_instances.add(key)
@@ -421,4 +445,4 @@ async def load_csv_and_create_objects(app):
                     logger.debug(f"Added {point_type} {name} (Cmd={commandable})")
 
             except Exception as e:
-                logger.error(f"Failed to create object from row {idx}: {e}")
+                logger.error(f"Failed to create object from row {idx}: {e}", exc_info=True)

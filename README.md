@@ -211,16 +211,50 @@ docker run --rm -it --network host --env-file .env --name diy-bacnet-gateway diy
 
 Swagger **Authorize** uses the same `BACNET_RPC_API_KEY` value as in that file.
 
-## Online documentation
+---
 
-- [bbartling.github.io/diy-bacnet-server](https://bbartling.github.io/diy-bacnet-server/)
+## Online Documentation
 
-## Dependancies
+This application is part of a broader ecosystem that together forms the **Open FDD AFDD Stack**, enabling a fully orchestrated, edge-deployable analytics and optimization platform for building automation systems.
 
-- Python 3.12+ (for local runs and tests)
-- `pip` + virtual environment tooling (`python3 -m venv`)
-- Docker (for container runs); use `--network host` for BACnet/IP behavior
-- OpenSSL (optional, used in examples to generate `BACNET_RPC_API_KEY`)
+* 🔗 **DIY BACnet Server**
+  Lightweight BACnet server with JSON-RPC and MQTT support for IoT integrations.
+  [Documentation](https://bbartling.github.io/diy-bacnet-server/) · [GitHub](https://github.com/bbartling/diy-bacnet-server)
+
+* 📖 **Open FDD AFDD Stack**
+  Full AFDD framework with Docker bootstrap, API services, drivers, and React web UI.
+  [Documentation](https://bbartling.github.io/open-fdd-afdd-stack/) · [GitHub](https://github.com/bbartling/open-fdd-afdd-stack)
+
+* 📘 **Open FDD Fault Detection Engine**
+  Core rules engine with `RuleRunner`, YAML-based fault logic, and pandas workflows.
+  [Documentation](https://bbartling.github.io/open-fdd/) · [GitHub](https://github.com/bbartling/open-fdd) · [PyPI](https://pypi.org/project/open-fdd/)
+
+* ⚙️ **easy-aso Framework**
+  Lightweight framework for Automated Supervisory Optimization (ASO) algorithms at the IoT edge.
+  [Documentation](https://bbartling.github.io/easy-aso/) · [GitHub](https://github.com/bbartling/easy-aso) · [PyPI](https://pypi.org/project/easy-aso/0.1.7/)
+
+
+---
+
+
+## Dependencies
+
+* Python 3.12+
+* `bacpypes3`
+* `ifaddr`
+* `fastapi-jsonrpc`
+* `uvicorn`
+* `requests`
+* `httpx`
+* `aiomqtt`
+* `pyModbusTCP>=0.2.0`
+* `pip` + virtual environment tooling (`python3 -m venv`)
+* Docker (for container runs; use `--network host` for BACnet/IP behavior)
+* OpenSSL (optional, used in examples to generate `BACNET_RPC_API_KEY`)
+
+---
+
+
 ## License
 
 MIT. See `LICENSE`.
