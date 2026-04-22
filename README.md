@@ -217,18 +217,22 @@ Swagger **Authorize** uses the same `BACNET_RPC_API_KEY` value as in that file.
 
 This application is part of a broader ecosystem that together forms the **Open FDD AFDD Stack**, enabling a fully orchestrated, edge-deployable analytics and optimization platform for building automation systems.
 
-* 🔗 **DIY BACnet Server Docs**
-  [https://bbartling.github.io/diy-bacnet-server/](https://bbartling.github.io/diy-bacnet-server/)
+* 🔗 **DIY BACnet Server**
+  Lightweight BACnet server with JSON-RPC and MQTT support for IoT integrations.
+  [Documentation](https://bbartling.github.io/diy-bacnet-server/) · [GitHub](https://github.com/bbartling/diy-bacnet-server)
 
-* 📖 **[Open FDD AFDD Stack Documentation](https://bbartling.github.io/open-fdd-afdd-stack/)**
-  End-to-end framework covering bootstrap setup, Docker deployment, API services, drivers, and the React-based web UI.
+* 📖 **Open FDD AFDD Stack**
+  Full AFDD framework with Docker bootstrap, API services, drivers, and React web UI.
+  [Documentation](https://bbartling.github.io/open-fdd-afdd-stack/) · [GitHub](https://github.com/bbartling/open-fdd-afdd-stack)
 
-* 📘 **[Open FDD Fault Detection Engine](https://bbartling.github.io/open-fdd/)**
-  Core rules engine featuring the `RuleRunner`, YAML-based fault logic, and pandas-driven data workflows.
-  ([GitHub Repo](https://github.com/bbartling/open-fdd) · [`open-fdd` on PyPI](https://pypi.org/project/open-fdd/))
+* 📘 **Open FDD Fault Detection Engine**
+  Core rules engine with `RuleRunner`, YAML-based fault logic, and pandas workflows.
+  [Documentation](https://bbartling.github.io/open-fdd/) · [GitHub](https://github.com/bbartling/open-fdd) · [PyPI](https://pypi.org/project/open-fdd/)
 
-* ⚙️ **[easy-aso](https://github.com/bbartling/easy-aso)**
-  A lightweight framework for implementing Automated Supervisory Optimization (ASO) algorithms at the IoT edge, designed to complement fault detection with real-time control strategies.
+* ⚙️ **easy-aso Framework**
+  Lightweight framework for Automated Supervisory Optimization (ASO) algorithms at the IoT edge.
+  [Documentation](https://bbartling.github.io/easy-aso/) · [GitHub](https://github.com/bbartling/easy-aso) · [PyPI](https://pypi.org/project/easy-aso/0.1.7/)
+
 
 ---
 
