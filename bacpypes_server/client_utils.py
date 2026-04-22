@@ -155,7 +155,7 @@ def server_schedule_to_json(obj: ScheduleObject) -> dict:
         "present_value": _numeric_schedule_value(obj.presentValue),
         "schedule_default": _numeric_schedule_value(obj.scheduleDefault),
         "weekly_schedule": weekly,
-        "exception_schedule_count": len(obj.exceptionSchedule or []),
+        "exception_schedule_count": len(getattr(obj, "exceptionSchedule", []) or []),
     }
 
 

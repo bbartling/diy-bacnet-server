@@ -211,16 +211,46 @@ docker run --rm -it --network host --env-file .env --name diy-bacnet-gateway diy
 
 Swagger **Authorize** uses the same `BACNET_RPC_API_KEY` value as in that file.
 
-## Online documentation
+---
 
-- [bbartling.github.io/diy-bacnet-server](https://bbartling.github.io/diy-bacnet-server/)
+## Online Documentation
 
-## Dependancies
+This application is part of a broader ecosystem that together forms the **Open FDD AFDD Stack**, enabling a fully orchestrated, edge-deployable analytics and optimization platform for building automation systems.
 
-- Python 3.12+ (for local runs and tests)
-- `pip` + virtual environment tooling (`python3 -m venv`)
-- Docker (for container runs); use `--network host` for BACnet/IP behavior
-- OpenSSL (optional, used in examples to generate `BACNET_RPC_API_KEY`)
+* 🔗 **DIY BACnet Server Docs**
+  [https://bbartling.github.io/diy-bacnet-server/](https://bbartling.github.io/diy-bacnet-server/)
+
+* 📖 **[Open FDD AFDD Stack Documentation](https://bbartling.github.io/open-fdd-afdd-stack/)**
+  End-to-end framework covering bootstrap setup, Docker deployment, API services, drivers, and the React-based web UI.
+
+* 📘 **[Open FDD Fault Detection Engine](https://bbartling.github.io/open-fdd/)**
+  Core rules engine featuring the `RuleRunner`, YAML-based fault logic, and pandas-driven data workflows.
+  ([GitHub Repo](https://github.com/bbartling/open-fdd) · [`open-fdd` on PyPI](https://pypi.org/project/open-fdd/))
+
+* ⚙️ **[easy-aso](https://github.com/bbartling/easy-aso)**
+  A lightweight framework for implementing Automated Supervisory Optimization (ASO) algorithms at the IoT edge, designed to complement fault detection with real-time control strategies.
+
+---
+
+
+## Dependencies
+
+* Python 3.12+
+* `bacpypes3`
+* `ifaddr`
+* `fastapi-jsonrpc`
+* `uvicorn`
+* `requests`
+* `httpx`
+* `aiomqtt`
+* `pyModbusTCP>=0.2.0`
+* `pip` + virtual environment tooling (`python3 -m venv`)
+* Docker (for container runs; use `--network host` for BACnet/IP behavior)
+* OpenSSL (optional, used in examples to generate `BACNET_RPC_API_KEY`)
+
+---
+
+
 ## License
 
 MIT. See `LICENSE`.
