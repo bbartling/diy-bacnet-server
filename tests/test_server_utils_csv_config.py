@@ -188,6 +188,7 @@ async def test_loader_schedule_pointtype_is_accepted(tmp_path, monkeypatch):
     schedule = server_utils.point_map["occupancy-schedule"]
     assert int(tuple(schedule.objectIdentifier)[1]) == 1
     assert getattr(schedule, "weeklySchedule", None) is not None
+    assert schedule in getattr(app, "objects", [])
     # If supported by BACpypes3 build, this should exist as an empty list.
     # On older builds the loader falls back without this property.
     if hasattr(schedule, "exceptionSchedule"):

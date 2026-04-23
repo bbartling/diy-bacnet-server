@@ -431,12 +431,21 @@ async def load_csv_and_create_objects(app):
                             "Schedule %s created with empty exceptionSchedule support",
                             name,
                         )
-                    except TypeError:
-                        obj = ScheduleObject(**schedule_kwargs)
-                        logger.warning(
-                            "Schedule %s created without exceptionSchedule property support",
-                            name,
-                        )
+                    except TypeError as exc:
+                        # Only fall back when this BACpypes3 build does not accept
+                        # the exceptionSchedule keyword; re-raise unrelated constructor
+                        # errors so real bugs are not hidden.
+                        msg = str(exc)
+                        if "exceptionSchedule" in msg and (
+                            "unexpected keyword" in msg or "required positional argument" in msg
+                        ):
+                            obj = ScheduleObject(**schedule_kwargs)
+                            logger.warning(
+                                "Schedule %s created without exceptionSchedule property support",
+                                name,
+                            )
+                        else:
+                            raise
 
                 if obj is not None:
                     used_instances.add(key)
