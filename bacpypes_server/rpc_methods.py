@@ -193,6 +193,10 @@ def server_read_commandable() -> dict:
 def server_read_all_values() -> dict:
     result = {}
     for name, obj in point_map.items():
+        # Schedule points have structured payload endpoints and do not belong in
+        # scalar "read all values" responses.
+        if isinstance(obj, ScheduleObject):
+            continue
         try:
             val = obj.presentValue
             result[name] = atomic_encode(val) if hasattr(val, "encode") else str(val)
