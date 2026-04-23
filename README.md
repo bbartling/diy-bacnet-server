@@ -262,4 +262,4 @@ This application is part of a broader ecosystem that together forms the **Open F
 
 ## License
 
-MIT. See `LICENSE`.
+MIT
