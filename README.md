@@ -52,6 +52,11 @@ commands: config, exit, help, iam, ihave, irt, rbdt, read, rfdt, rpm, wbdt, whoh
 
 #### Example: Device Discovery (`whois`)
 
+
+> **NOTE:** If the step below does not work, the entire web application framework will not function. This step is critical.
+> The `whois` command also accepts a range of BACnet instance IDs. For example: `> whois 1 100`.
+
+
 ```bash
 > whois
 ```
@@ -257,4 +262,4 @@ This application is part of a broader ecosystem that together forms the **Open F
 
 ## License
 
-MIT. See `LICENSE`.
+MIT
