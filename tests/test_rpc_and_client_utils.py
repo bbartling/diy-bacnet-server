@@ -235,3 +235,18 @@ async def test_server_update_schedule_updates_default_and_weekly(monkeypatch):
     assert result["changed"]["weekly_schedule_days"] == 7
     assert "18:00:00" in result["schedule"]["weekly_schedule"][0][1]["time"]
 
+
+@pytest.mark.asyncio
+async def test_server_read_all_values_skips_schedule_objects(monkeypatch):
+    class _Point:
+        def __init__(self, value):
+            self.presentValue = value
+
+    schedule = _build_schedule_object()
+    monkeypatch.setitem(rpc_methods.point_map, "occupancy-schedule", schedule)
+    monkeypatch.setitem(rpc_methods.point_map, "web-weather-dry-bulb", _Point(111))
+
+    result = rpc_methods.server_read_all_values()
+    assert "web-weather-dry-bulb" in result
+    assert "occupancy-schedule" not in result
+

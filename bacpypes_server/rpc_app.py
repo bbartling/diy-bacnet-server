@@ -8,10 +8,6 @@ from bacpypes_server.rpc_auth import (
     install_openapi_servers_url_from_env,
     install_rpc_auth_if_configured,
 )
-from bacpypes_server.rest_whois_nested import (
-    install_openapi_whois_rest_example_patch,
-    register_whois_nested_rest_routes,
-)
 from bacpypes_server.modbus_routes import register_modbus_routes
 from bacpypes_server.rpc_methods import CLIENT_TAG, SERVER_TAG, rpc
 
@@ -44,9 +40,7 @@ rpc_api.bind_entrypoint(rpc)
 install_openapi_bearer_for_swagger(rpc_api)
 install_rpc_auth_if_configured(rpc_api)
 
-register_whois_nested_rest_routes(rpc_api)
 register_modbus_routes(rpc_api)
-install_openapi_whois_rest_example_patch(rpc_api)
 install_openapi_servers_url_from_env(rpc_api)
 
 
