@@ -200,18 +200,64 @@ If you don’t see `200`, it’s almost always a firewall or network interface b
 
 ---
 
-## Docker diy-bacnet-server
 
-`--network host` is a Docker option: the container shares the host’s network stack instead of a private bridge/NAT network. That keeps BACnet/IP (UDP broadcasts and port 47808) behaving like running Python directly on the machine. Swagger **Authorize** still uses the same `BACNET_RPC_API_KEY` value you put in `.env`. Skip `git clone` / `cd` if you already have the repo.
+## Docker diy-bacnet-server (Long-Running BACnet Deployment)
+
+`--network host` is required for BACnet/IP so UDP broadcasts (port `47808`) work correctly on the LAN.
 
 ```bash
 git clone https://github.com/bbartling/diy-bacnet-server.git
 cd diy-bacnet-server
 printf 'BACNET_RPC_API_KEY=%s\n' "$(openssl rand -hex 32)" > .env
 docker build -t diy-bacnet-server .
-docker run --rm -it --network host --env-file .env --name diy-bacnet-gateway diy-bacnet-server \
+
+docker run -d \
+  --network host \
+  --restart unless-stopped \
+  --env-file .env \
+  --name diy-bacnet-gateway \
+  diy-bacnet-server \
   python3 -u -m bacpypes_server.main \
-  --name asdf --instance 123456 --address 192.168.204.18/24:47808 --public --debug
+  --name asdf \
+  --instance 123456 \
+  --address 192.168.204.18/24:47808 \
+  --public
+```
+
+Swagger **Authorize** uses the same `BACNET_RPC_API_KEY` from `.env`.
+
+---
+
+## Quick Ops
+
+**Logs**
+
+```bash
+docker logs -f diy-bacnet-gateway
+```
+
+**Stop**
+
+```bash
+docker stop diy-bacnet-gateway
+```
+
+**Start**
+
+```bash
+docker start diy-bacnet-gateway
+```
+
+**Restart**
+
+```bash
+docker restart diy-bacnet-gateway
+```
+
+**Remove (fresh rebuild)**
+
+```bash
+docker rm -f diy-bacnet-gateway
 ```
 
 Swagger **Authorize** uses the same `BACNET_RPC_API_KEY` value as in that file.
